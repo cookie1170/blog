@@ -1,7 +1,7 @@
 +++
 title = "Hello there!"
 date = "2026-09-16"
-tags = ["Tag stuff yes", "more tag stuff yes", "another tag stuff yes"]
+tags = ["Test", "Useless", "Silly"]
 +++
 
 # Hello!
@@ -20,13 +20,13 @@ It can also do
 
 Maths! $S = pi r^2$
 
-+++
-name = "Metadata!"
-+++
-
 $$
 x = x_0 + v_0 t + frac(a t^2, 2)
 $$
+
++++
+name = "Metadata!"
++++
 
 ```rs
 fn main() {

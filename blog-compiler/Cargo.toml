@@ -1,0 +1,18 @@
+[package]
+name = "blog-compiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+bumpalo = { version = "3.20.3", features = ["std", "allocator_api"] }
+dircpy = "0.3.20"
+jiff = { version = "0.2.37", features = ["serde"] }
+notify = "8.2.0"
+openssl = "0.10.81"
+pulldown-cmark = { version = "0.13.4", features = ["simd"] }
+pulldown-cmark-escape = { version = "0.11.0", features = ["simd"] }
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.6"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"

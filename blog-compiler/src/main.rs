@@ -1,0 +1,225 @@
+#![feature(allocator_api)]
+
+fn main() -> anyhow::Result<()> {
+    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
+
+    let path = std::env::args()
+        .nth(1)
+        .context("expected blog directory argument")?;
+
+    let mut blog = Blog::new(path.into())?;
+
+    if let Err(e) = blog.recompile() {
+        error!("{e:?}");
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let mut watcher =
+        notify::recommended_watcher(tx).context("failed to intialise filesystem watcher")?;
+
+    watcher
+        .watch(&blog.posts_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.posts_dir.display()))?;
+    info!("watching {}", blog.posts_dir.display());
+
+    watcher
+        .watch(&blog.posts_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.static_dir.display()))?;
+    info!("watching {}", blog.static_dir.display());
+
+    for event in rx {
+        let event = event.context("failed to receive notify event")?;
+        if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
+            continue;
+        }
+        if let Err(e) = blog.recompile() {
+            error!("{e:?}");
+        }
+    }
+
+    Ok(())
+}
+
+mod parser;
+mod renderer;
+mod typst;
+
+#[derive(Debug)]
+pub struct Blog {
+    dist_dir: PathBuf,
+    posts_dir: PathBuf,
+    static_dir: PathBuf,
+    dist_static_dir: PathBuf,
+    posts: Vec<Post>,
+    bump: Bump,
+}
+
+impl Blog {
+    pub fn new(root: PathBuf) -> anyhow::Result<Self> {
+        let root = root
+            .canonicalize()
+            .with_context(|| format!("failed to canonicalize '{}'", root.display()))?;
+        let posts_dir = root.join("posts");
+        let dist_dir = root.join("dist");
+        let static_dir = root.join("static");
+        let dist_static_dir = dist_dir.join("static");
+        let mut blog = Self {
+            posts_dir,
+            dist_dir,
+            static_dir,
+            dist_static_dir,
+            posts: Vec::new(),
+            bump: Bump::with_capacity(65536),
+        };
+        blog.update_posts()?;
+        Ok(blog)
+    }
+
+    pub fn update_posts(&mut self) -> anyhow::Result<()> {
+        self.posts.clear();
+        for post in fs::read_dir(&self.posts_dir).context("failed to read posts")? {
+            let post = post.context("failed to read post")?;
+            if !post
+                .metadata()
+                .context("failed to get post metadata")?
+                .is_dir()
+            {
+                continue;
+            }
+            let post = Post::new(post.path()).context("failed to create post")?;
+            self.posts.push(post);
+        }
+
+        Ok(())
+    }
+
+    pub fn recompile(&mut self) -> anyhow::Result<()> {
+        let _ = fs::remove_dir_all(&self.dist_static_dir);
+        dircpy::CopyBuilder::new(&self.static_dir, &self.dist_static_dir)
+            .overwrite(true)
+            .run()
+            .with_context(|| {
+                format!(
+                    "failed to copy '{}' to '{}'",
+                    self.static_dir.display(),
+                    self.dist_static_dir.display()
+                )
+            })?;
+
+        for post in &self.posts {
+            let output_path = self.dist_dir.join(&post.name);
+            let _ = fs::remove_dir(&output_path);
+            fs::create_dir_all(&output_path).with_context(|| {
+                format!(
+                    "failed to create output directory '{}'",
+                    output_path.display()
+                )
+            })?;
+            self.bump.reset();
+            post.compile(&output_path, &self.bump)
+                .with_context(|| format!("failed to compile post {}", post.name))?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Post {
+    name: String,
+    path: PathBuf,
+}
+
+#[derive(Deserialize, PartialEq, Debug, Clone)]
+pub struct PostMeta {
+    title: String,
+    date: Date,
+    tags: Vec<String>,
+}
+
+impl Post {
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let path = path
+            .canonicalize()
+            .with_context(|| format!("failed to canonicalize '{}'", path.display()))?;
+        let name = path
+            .file_name()
+            .context("failed to get post file name")?
+            .to_string_lossy()
+            .into_owned();
+
+        Ok(Self { name, path })
+    }
+
+    pub fn compile(&self, output_path: &Path, bump: &Bump) -> Result<()> {
+        let markdown = self.path.join(&self.name).with_extension("md");
+        let markdown = fs::read_to_string(&markdown)
+            .with_context(|| format!("failed to read '{}'", markdown.display()))?;
+
+        let hash = self.get_current_hash(&markdown);
+        let hash_path = output_path.join("hash.sha256");
+        let last_hash = self.get_last_hash(&hash_path);
+        if last_hash.is_ok_and(|h| hash == h) {
+            return Ok(());
+        }
+
+        info!("compiling post '{}'", self.name);
+        let html_path = output_path.join("index.html");
+        let out_html = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&html_path)
+            .with_context(|| format!("failed to open '{}'", html_path.display()))?;
+
+        let out_html = BufWriter::new(out_html);
+
+        renderer::render(&markdown, out_html, bump).context("failed to render html")?;
+
+        let images_path = self.path.join("images");
+        let dist_images_path = output_path.join("images");
+        let _ = fs::remove_dir_all(&dist_images_path);
+        dircpy::CopyBuilder::new(&images_path, &dist_images_path)
+            .overwrite(true)
+            .run()
+            .with_context(|| {
+                format!(
+                    "failed to copy '{}' to '{}'",
+                    images_path.display(),
+                    dist_images_path.display()
+                )
+            })?;
+
+        fs::write(&hash_path, hash)
+            .with_context(|| format!("failed to write hash to {}", hash_path.display()))?;
+
+        info!("finished compiling post '{}'", self.name);
+
+        Ok(())
+    }
+
+    pub fn get_current_hash(&self, markdown: &str) -> [u8; 32] {
+        openssl::sha::sha256(markdown.as_bytes())
+    }
+
+    pub fn get_last_hash(&self, hash_path: &Path) -> Result<[u8; 32]> {
+        fs::read(hash_path)
+            .with_context(|| format!("failed to read {}", hash_path.display()))?
+            .try_into()
+            .ok()
+            .context("hash must have 32 bytes")
+    }
+}
+
+use anyhow::{Context, Result};
+use bumpalo::Bump;
+use jiff::civil::Date;
+use notify::{EventKind, RecursiveMode, Watcher};
+use serde::Deserialize;
+use std::{
+    fs::{self, OpenOptions},
+    io::BufWriter,
+    path::{Path, PathBuf},
+    sync::mpsc,
+};
+use tracing::*;
