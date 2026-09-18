@@ -1,0 +1,51 @@
+label.footnote {
+    vertical-align: super;
+    font-size: 0.75rem;
+    color: blue;
+    cursor: pointer;
+}
+
+label.footnote:hover {
+    text-decoration: underline;
+}
+
+input.footnote {
+    display: none;
+}
+span.footnote {
+    display: none;
+}
+input.footnote:checked + span.footnote {
+    display: block;
+    float: left;
+    clear: right;
+    margin: 0.5rem;
+    width: calc(100% - 1rem);
+}
+
+.code-wrapper {
+    margin: 0;
+    /* make sure it can't stretch beyond its parent */
+    max-width: 100%;
+    /* inline-block here is required, otherwise it gets pushed to the right (for whatever reason?) by footntoes */
+    display: inline-block;
+}
+
+.code-wrapper code {
+    max-width: 100%;
+    /* make it scroll when the code is too long. also requires inline-block */
+    overflow-x: scroll;
+    display: inline-block;
+}
+
+.table-align-left {
+    text-align: left;
+}
+
+.table-align-right {
+    text-align: right;
+}
+
+.table-align-centre {
+    text-align: center;
+}
