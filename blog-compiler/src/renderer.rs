@@ -4,11 +4,12 @@ struct Renderer<'i, 'm, 'b, O: io::Write> {
     post_meta: &'m PostMeta,
     output: IoWriter<BufWriter<O>>,
     typst: TypstCompiler,
+    bump: &'b Bump,
 }
 
 impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
-        self.write(
+        self.write_fmt(format_args!(
             r#"
 <!doctype html>
 <html lang="en-US">
@@ -16,31 +17,43 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
         <link href="/static/style.css" rel="stylesheet">
-        "#
-            .trim(),
-        )?;
-        self.output.0.write_fmt(format_args!(
-            "<title>{} -- Cookie's blog</title>",
-            self.post_meta.title
-        ))?;
-        self.write(
-            r#"
+        <title>{title} -- Cookie's blog</title>
     </head>
     <body>
-            "#
-            .trim(),
-        )?;
+        <div class="post">
+            <div class="head">
+                <h1 class="title">{title}</h1>
+                <p class="date">{date}</h1>
+                <div class="tags-list">{tags}</div>
+            </div>
+            <div class="body">
+        "#,
+            title = self.post_meta.title,
+            date = self.post_meta.date.strftime("%d %B %Y"),
+            tags = String::from_utf8_lossy(&self.format_tags()?),
+        ))?;
         Ok(())
     }
 
     pub fn write_ending_html(&mut self) -> Result<()> {
         self.write(
             r#"
+            </div>
+        </div>
     </body>
 </html>
             "#,
         )?;
         Ok(())
+    }
+
+    pub fn format_tags(&self) -> Result<Vec<u8, &'b Bump>> {
+        let mut result = Vec::with_capacity_in(64, self.bump);
+        for tag in &self.post_meta.tags {
+            write!(&mut result, r#"<div class="tag">{}</div>"#, tag)?;
+        }
+
+        Ok(result)
     }
 
     pub fn process_event(&mut self, event: Event<'i>) -> Result<()> {
@@ -357,6 +370,7 @@ pub fn render<O: io::Write>(source: &str, output: BufWriter<O>, bump: &Bump) -> 
         post_meta: &post_meta,
         output: IoWriter(output),
         typst: TypstCompiler::new(),
+        bump,
     };
 
     renderer.write_beginning_html()?;
