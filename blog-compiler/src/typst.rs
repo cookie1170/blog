@@ -12,6 +12,7 @@ impl TypstCompiler {
             .arg("-")
             .arg("-")
             .args(["--format", "svg"])
+            .args(["--font-path", "dist/static/fonts"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -24,7 +25,7 @@ impl TypstCompiler {
             .context("typst process should have stdin handle")?;
 
         stdin.write_fmt(format_args!(
-            "#set page(width: auto, height: auto, margin: 0cm); $ {math_expr} $"
+            r#"#set page(width: auto, height: auto, margin: 0cm); #show math.equation: set text(font: "Fira Math"); $ {math_expr} $"#
         ))?;
         stdin.flush()?;
         typst.stdin = Some(stdin);

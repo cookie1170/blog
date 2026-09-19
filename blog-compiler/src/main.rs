@@ -3,9 +3,7 @@
 fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
 
-    let path = std::env::args()
-        .nth(1)
-        .context("expected blog directory argument")?;
+    let path = std::env::current_dir().context("failed to get cwd")?;
 
     let mut blog = Blog::new(path.into())?;
 
@@ -23,7 +21,7 @@ fn main() -> anyhow::Result<()> {
     info!("watching {}", blog.posts_dir.display());
 
     watcher
-        .watch(&blog.posts_dir, RecursiveMode::Recursive)
+        .watch(&blog.static_dir, RecursiveMode::Recursive)
         .with_context(|| format!("failed to watch '{}'", blog.static_dir.display()))?;
     info!("watching {}", blog.static_dir.display());
 

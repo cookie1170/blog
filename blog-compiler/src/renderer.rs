@@ -23,8 +23,8 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
         <div class="post">
             <div class="head">
                 <h1 class="title">{title}</h1>
+                <div class="tags">{tags}</div>
                 <p class="date">{date}</h1>
-                <div class="tags-list">{tags}</div>
             </div>
             <div class="body">
         "#,
@@ -64,7 +64,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
             E::Text(text) => self.write_escaped(&text)?,
 
             E::Code(code) => {
-                self.write("<code>")?;
+                self.write(r#"<code class="inline-code">"#)?;
                 self.write_escaped(&code)?;
                 self.write("</code>")?;
             }
@@ -88,7 +88,14 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
             Event::Rule => self.write("<hr />")?,
             Event::TaskListMarker(state) => {
                 self.write_fmt(format_args!(
-                    "<input type=\"checkbox\" class=\"task-marker\" disabled checked=\"{state}\" />"
+                    r#"
+                    <svg height="16px" width="16px" class="task-marker">{}</svg>
+                "#,
+                    if state {
+                        r#"<use href="/static/check.svg#check"></use>"#
+                    } else {
+                        ""
+                    }
                 ))?;
             }
             Event::MetadataBlock(meta) => {
@@ -235,6 +242,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
                     self.write("\" title=\"")?;
                     self.write_escaped_attr(&title)?;
                 }
+                self.write("\">")?;
             }
             Tag::Image {
                 link_type: _,

@@ -4,7 +4,6 @@ date = "2026-09-16"
 tags = ["Test", "Useless", "Silly"]
 +++
 
-# Hello!
 This is a **test blog post** to test this stuff[^stuff]. it's _very cool_![^cool]
 
 [^stuff]: This is, indeed, stuff
@@ -12,7 +11,9 @@ This is a **test blog post** to test this stuff[^stuff]. it's _very cool_![^cool
 
 ## With a header, even!
 
-And some more **bold**, _italic_, ~~strikethrough~~, ^superscript^, ~subscript~, `code` text!
+And some more **bold**, _italic_, ~~strikethrough~~, ^superscript^, ~subscript~, `code`, [link] text!
+
+[link]: https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 ---
 
@@ -28,30 +29,22 @@ $$
 name = "Metadata!"
 +++
 
+Footnotes[^footnote]
+
+[^footnote]: Like this one!
+
 ```rs
 fn main() {
     println!("Codeblocks!");
 }
 ```
 
-> [!NOTE]
-> Notes!
->
-> With multiple lines!
+```java
+// actual class btw :p
+new org.springframework.aop.framework.ProxyConfig.AbstractSingletonProxyFactoryBean().SomeVeryVeryLongMethodName();
+```
 
-> [!TIP]
-> Tips!
-
-> [!IMPORTANT]
-> Important stuff!
-
-> [!WARNING]
-> Warnings!
-
-> [!CAUTION]
-> Caution warnings
-
-> And regular block quotes
+> Blockquotes!
 
 - Unordered
 - Lists
@@ -68,3 +61,5 @@ fn main() {
 
 - [ ] Tasks
 - [x] Done!
+
+![Comfy](images/comfy.png "Comfy")

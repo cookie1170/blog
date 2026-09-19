@@ -1,7 +1,134 @@
+/* global */
+:root {
+    --bg: #252225;
+    --on-bg: #e5e2dc;
+    --container: #292529;
+    --on-container: #e3ded4;
+    --container-2: #333033;
+    --on-container-2: #eee9e1;
+    --muted: #757075;
+    --accent: #f27e38;
+    --on-accent: #292529;
+}
+
+:root {
+    font-family: "PT Sans", sans-serif;
+    clear: left;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--on-bg);
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* post */
+
+hr {
+    color: var(--container-2);
+}
+
+.post {
+    align-self: center;
+    width: min(50rem, 100%);
+    padding: 0.75rem;
+    box-sizing: border-box;
+}
+
+.head {
+    padding: 0.25rem;
+    padding-left: 0.75rem;
+}
+
+.title {
+    margin: 0.25rem 0;
+}
+
+.date {
+    margin: 0.25rem 0;
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+.tags {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag {
+    background-color: var(--accent);
+    color: var(--on-accent);
+    padding: 0 0.5rem;
+    /* big number. but 100% makes it an elipse for whatever reason */
+    border-radius: 500px;
+}
+
+/* elements */
+
+.head,
+blockquote {
+    background-color: var(--container);
+    color: var(--on-container);
+    border-left: var(--container-2) solid 0.5rem;
+}
+blockquote {
+    padding: 0.25rem;
+    padding-left: 0.5rem;
+    margin-left: 1rem;
+}
+
+blockquote p {
+    margin: 0.25rem 0;
+}
+
+/* table */
+
+table {
+    border-collapse: collapse;
+}
+
+th {
+    background-color: var(--container-2);
+    color: var(--on-container-2);
+    padding: 0.2rem;
+    outline: none;
+}
+
+td {
+    background-color: var(--container);
+    color: var(--on-container);
+    padding: 0.2rem;
+    outline: none;
+}
+
+tr {
+    gap: 0;
+}
+
+.table-align-left {
+    text-align: left;
+}
+
+.table-align-right {
+    text-align: right;
+}
+
+.table-align-centre {
+    text-align: center;
+}
+
+/* footnote stuff */
+
 label.footnote {
     vertical-align: super;
     font-size: 0.75rem;
-    color: blue;
+    color: var(--accent);
     cursor: pointer;
 }
 
@@ -18,34 +145,98 @@ span.footnote {
 input.footnote:checked + span.footnote {
     display: block;
     float: left;
-    clear: right;
-    margin: 0.5rem;
-    width: calc(100% - 1rem);
+    clear: both;
+    margin: 0.5rem 0;
+    width: 100%;
+}
+
+/* code blocks */
+
+code.inline-code {
+    background-color: var(--container);
+    color: var(--on-container);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    border: var(--container-2) solid 1px;
 }
 
 .code-wrapper {
-    margin: 0;
     /* make sure it can't stretch beyond its parent */
     max-width: 100%;
-    /* inline-block here is required, otherwise it gets pushed to the right (for whatever reason?) by footntoes */
-    display: inline-block;
-}
-
-.code-wrapper code {
-    max-width: 100%;
-    /* make it scroll when the code is too long. also requires inline-block */
     overflow-x: scroll;
-    display: inline-block;
+    padding: 0.5rem;
+    background-color: var(--container);
+    color: var(--on-container);
+    border: var(--container-2) solid 1px;
 }
 
-.table-align-left {
-    text-align: left;
+/* misc */
+
+p {
+    max-width: 100%;
 }
 
-.table-align-right {
-    text-align: right;
+a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: bold;
 }
 
-.table-align-centre {
-    text-align: center;
+a:hover {
+    text-decoration: underline;
+}
+
+.task-marker {
+    background-color: var(--container-2);
+    fill: var(--on-container-2);
+    vertical-align: middle;
+    margin: 0.125rem;
+    margin-right: 0.25rem;
+    border-radius: 0.25rem;
+}
+
+/* HACK: typst's svg output hardcodes colours as `fill="000000"`, etc */
+svg [stroke="#000000"] {
+    stroke: var(--on-bg);
+}
+
+svg [fill="#000000"] {
+    fill: var(--on-bg);
+}
+
+svg [stroke="#ffffff"] {
+    stroke: var(--bg);
+}
+
+svg [fill="#ffffff"] {
+    fill: var(--bg);
+}
+
+@font-face {
+    font-family: "PT Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(/static/fonts/PTSans-Regular.ttf) format("truetype");
+}
+@font-face {
+    font-family: "PT Sans";
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url(/static/fonts/PTSans-Italic.ttf) format("truetype");
+}
+@font-face {
+    font-family: "PT Sans";
+    font-style: italic;
+    font-weight: 700;
+    font-display: swap;
+    src: url(/static/fonts/PTSans-BoldItalic.ttf) format("truetype");
+}
+@font-face {
+    font-family: "PT Sans";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(/static/fonts/PTSans-Bold.ttf) format("truetype");
 }
