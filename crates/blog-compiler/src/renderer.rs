@@ -9,14 +9,15 @@ impl Renderer {
     }
 }
 
-struct RendererInner<'i, 'm, 'r, O: io::Write> {
+struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
     events: IntoIter<Event<'i>>,
     post_meta: &'m PostMeta,
     output: IoWriter<BufWriter<O>>,
     outer: &'r mut Renderer,
+    slug: &'s str,
 }
 
-impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
+impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
         self.write_fmt(format_args!(
             r#"
@@ -100,10 +101,10 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 self.write("</p>")?;
             }
             E::Html(html) | E::InlineHtml(html) => self.write(&html as &str)?,
-            Event::SoftBreak => self.write("\n")?,
-            Event::HardBreak => self.write("<br />")?,
-            Event::Rule => self.write("<hr />")?,
-            Event::TaskListMarker(state) => {
+            E::SoftBreak => self.write("\n")?,
+            E::HardBreak => self.write("<br />")?,
+            E::Rule => self.write("<hr />")?,
+            E::TaskListMarker(state) => {
                 self.write_fmt(format_args!(
                     r#"
                     <svg height="16px" width="16px" class="task-marker">{}</svg>
@@ -115,7 +116,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                     }
                 ))?;
             }
-            Event::MetadataBlock(meta) => {
+            E::MetadataBlock(meta) => {
                 tracing::info!("found meta:\n{meta}");
             }
         }
@@ -254,6 +255,9 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 id: _,
             } => {
                 self.write("<a href=\"")?;
+                if dest_url.starts_with('/') {
+                    self.write(PREFIX)?;
+                }
                 self.write_escaped_href(&dest_url)?;
                 if !title.is_empty() {
                     self.write("\" title=\"")?;
@@ -267,7 +271,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
-                self.write("<img src=\"")?;
+                self.write_fmt(format_args!("<img src=\"{}/", &*self.slug))?;
                 self.write_escaped_href(&dest_url)?;
                 self.write("\" alt=\"")?;
                 self.raw_text()?;
@@ -387,7 +391,12 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
 }
 
 impl Renderer {
-    pub fn render<O: io::Write>(&mut self, source: &str, output: BufWriter<O>) -> Result<PostMeta> {
+    pub fn render<O: io::Write>(
+        &mut self,
+        source: &str,
+        slug: &str,
+        output: BufWriter<O>,
+    ) -> Result<PostMeta> {
         let ParseResult { root_meta, events } = parser::parse(source)?;
         let events = events.into_iter();
         let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
@@ -396,6 +405,7 @@ impl Renderer {
             post_meta: &post_meta,
             output: IoWriter(output),
             outer: self,
+            slug,
         };
 
         renderer.write_beginning_html()?;

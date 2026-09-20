@@ -51,11 +51,11 @@ impl Blog {
                 continue;
             }
             let path = post.path();
-            let name = path
+            let slug = path
                 .file_name()
                 .map(OsStr::to_string_lossy)
                 .context("failed to get post file name")?;
-            let post = Processor::new(Post::new(name.into_owned()));
+            let post = Processor::new(Post::new(slug.into_owned()));
             self.posts.push(post);
         }
 
@@ -71,8 +71,8 @@ impl Blog {
             .run(&self.public_dir, &self.dist_public_dir)?;
 
         for post in &mut self.posts {
-            let output_path = self.dist_dir.join(&post.process.name);
-            let input_path = self.posts_dir.join(&post.process.name);
+            let output_path = self.dist_dir.join(&post.process.slug);
+            let input_path = self.posts_dir.join(&post.process.slug);
             post.run(&input_path, &output_path)
                 .with_context(|| format!("failed to compile post at {}", input_path.display()))?;
         }
@@ -82,7 +82,7 @@ impl Blog {
 }
 
 pub struct Post {
-    name: String,
+    slug: String,
     renderer: Renderer,
     copy_images: Processor<CopyDir>,
 }
@@ -95,11 +95,11 @@ pub struct PostMeta {
 }
 
 impl Post {
-    pub fn new(name: String) -> Self {
+    pub fn new(slug: String) -> Self {
         let renderer = Renderer::new();
 
         Self {
-            name,
+            slug,
             renderer,
             copy_images: Processor::new(CopyDir),
         }
@@ -110,9 +110,9 @@ impl Process for Post {
     type Output = PostMeta;
 
     fn execute(&mut self, in_path: &Path, out_path: &Path) -> Result<PostMeta> {
-        info!("compiling post '{}'", self.name);
+        info!("compiling post '{}'", self.slug);
 
-        let markdown = in_path.join(&self.name).with_extension("md");
+        let markdown = in_path.join(&self.slug).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
 
@@ -128,7 +128,7 @@ impl Process for Post {
 
         let meta = self
             .renderer
-            .render(&markdown, out_html)
+            .render(&markdown, &self.slug, out_html)
             .context("failed to render html")?;
 
         let images_path = in_path.join("images");
