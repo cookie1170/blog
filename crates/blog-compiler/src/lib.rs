@@ -1,4 +1,7 @@
+#![feature(associated_type_defaults)]
+
 mod parser;
+mod processor;
 mod renderer;
 mod typst;
 
@@ -9,7 +12,8 @@ pub struct Blog {
     pub posts_dir: PathBuf,
     pub public_dir: PathBuf,
     pub dist_public_dir: PathBuf,
-    posts: Vec<Post>,
+    copy_public_dir: Processor<CopyDir>,
+    posts: Vec<Processor<Post>>,
 }
 
 impl Blog {
@@ -26,6 +30,7 @@ impl Blog {
             dist_dir,
             public_dir,
             dist_public_dir,
+            copy_public_dir: Processor::new(CopyDir),
             posts: Vec::new(),
         };
         blog.update_posts()?;
@@ -45,7 +50,12 @@ impl Blog {
             {
                 continue;
             }
-            let post = Post::new(post.path()).context("failed to create post")?;
+            let path = post.path();
+            let name = path
+                .file_name()
+                .map(OsStr::to_string_lossy)
+                .context("failed to get post file name")?;
+            let post = Processor::new(Post::new(name.into_owned()));
             self.posts.push(post);
         }
 
@@ -57,22 +67,14 @@ impl Blog {
             let _ = fs::remove_dir_all(&self.dist_dir);
         }
 
-        let _ = fs::remove_dir_all(&self.dist_public_dir);
-        dircpy::CopyBuilder::new(&self.public_dir, &self.dist_public_dir)
-            .overwrite(true)
-            .run()
-            .with_context(|| {
-                format!(
-                    "failed to copy '{}' to '{}'",
-                    self.public_dir.display(),
-                    self.dist_public_dir.display()
-                )
-            })?;
+        self.copy_public_dir
+            .run(&self.public_dir, &self.dist_public_dir)?;
 
         for post in &mut self.posts {
-            let output_path = self.dist_dir.join(&post.name);
-            post.compile(&output_path)
-                .with_context(|| format!("failed to compile post {}", post.name))?;
+            let output_path = self.dist_dir.join(&post.process.name);
+            let input_path = self.posts_dir.join(&post.process.name);
+            post.run(&input_path, &output_path)
+                .with_context(|| format!("failed to compile post at {}", input_path.display()))?;
         }
 
         Ok(())
@@ -81,8 +83,8 @@ impl Blog {
 
 pub struct Post {
     name: String,
-    path: PathBuf,
     renderer: Renderer,
+    copy_images: Processor<CopyDir>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
@@ -93,47 +95,28 @@ pub struct PostMeta {
 }
 
 impl Post {
-    pub fn new(path: PathBuf) -> Result<Self> {
-        let path = path
-            .canonicalize()
-            .with_context(|| format!("failed to canonicalize '{}'", path.display()))?;
-        let name = path
-            .file_name()
-            .context("failed to get post file name")?
-            .to_string_lossy()
-            .into_owned();
-
+    pub fn new(name: String) -> Self {
         let renderer = Renderer::new();
 
-        Ok(Self {
+        Self {
             name,
-            path,
             renderer,
-        })
-    }
-
-    pub fn compile(&mut self, output_path: &Path) -> Result<Option<PostMeta>> {
-        let hash = self.compute_hash().context("failed to compute post hash")?;
-        let hash_path = output_path.join("hash.sha256");
-        let last_hash = self.get_last_hash(&hash_path);
-        if last_hash.is_ok_and(|h| hash == h) {
-            return Ok(None);
+            copy_images: Processor::new(CopyDir),
         }
+    }
+}
+
+impl Process for Post {
+    type Output = PostMeta;
+
+    fn execute(&mut self, in_path: &Path, out_path: &Path) -> Result<PostMeta> {
         info!("compiling post '{}'", self.name);
 
-        let _ = fs::remove_dir_all(&output_path);
-        fs::create_dir_all(&output_path).with_context(|| {
-            format!(
-                "failed to create output directory '{}'",
-                output_path.display()
-            )
-        })?;
-
-        let markdown = self.path.join(&self.name).with_extension("md");
+        let markdown = in_path.join(&self.name).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
 
-        let html_path = output_path.join("index.html");
+        let html_path = out_path.join("index.html");
         let out_html = OpenOptions::new()
             .write(true)
             .create(true)
@@ -148,67 +131,26 @@ impl Post {
             .render(&markdown, out_html)
             .context("failed to render html")?;
 
-        let images_path = self.path.join("images");
-        let dist_images_path = output_path.join("images");
-        let _ = fs::remove_dir_all(&dist_images_path);
-        dircpy::CopyBuilder::new(&images_path, &dist_images_path)
-            .overwrite(true)
-            .run()
-            .with_context(|| {
-                format!(
-                    "failed to copy '{}' to '{}'",
-                    images_path.display(),
-                    dist_images_path.display()
-                )
-            })?;
+        let images_path = in_path.join("images");
+        let dist_images_path = out_path.join("images");
+        self.copy_images.run(&images_path, &dist_images_path)?;
 
-        fs::write(&hash_path, hash)
-            .with_context(|| format!("failed to write hash to {}", hash_path.display()))?;
-
-        Ok(Some(meta))
-    }
-
-    pub fn compute_hash(&self) -> Result<[u8; 32]> {
-        let mut hasher = Sha256::new();
-        let mut buf = Vec::with_capacity(1024);
-
-        for entry in WalkDir::new(&self.path) {
-            let entry = entry.context("error when walking post directory")?;
-            hasher.update(entry.path().as_os_str().as_bytes());
-            if entry.file_type().is_file() {
-                buf.clear();
-                let mut reader = File::open(entry.path())
-                    .with_context(|| format!("failed to open {}", entry.path().display()))?;
-                reader
-                    .read_to_end(&mut buf)
-                    .with_context(|| format!("failed to read {}", entry.path().display()))?;
-                hasher.update(&buf);
-            }
-        }
-
-        Ok(hasher.finish())
-    }
-
-    pub fn get_last_hash(&self, hash_path: &Path) -> Result<[u8; 32]> {
-        fs::read(hash_path)
-            .with_context(|| format!("failed to read {}", hash_path.display()))?
-            .try_into()
-            .ok()
-            .context("hash must have 32 bytes")
+        Ok(meta)
     }
 }
 
 use anyhow::{Context, Result};
 use jiff::civil::Date;
-use openssl::sha::Sha256;
 use serde::Deserialize;
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{BufWriter, Read},
-    os::unix::ffi::OsStrExt,
+    ffi::OsStr,
+    fs::{self, OpenOptions},
+    io::BufWriter,
     path::{Path, PathBuf},
 };
 use tracing::*;
-use walkdir::WalkDir;
 
-use crate::renderer::Renderer;
+use crate::{
+    processor::{CopyDir, Process, Processor},
+    renderer::Renderer,
+};
