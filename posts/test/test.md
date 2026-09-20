@@ -41,7 +41,7 @@ fn main() {
 
 ```java
 // actual class btw :p
-new org.springframework.aop.framework.ProxyConfig.AbstractSingletonProxyFactoryBean().SomeVeryVeryLongMethodName();
+new org.springframework.aop.framework.AbstractSingletonProxyFactoryBean().SomeVeryVeryLongMethodNameSoItStartsToScroll();
 ```
 
 > Blockquotes!
