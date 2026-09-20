@@ -2,7 +2,7 @@ mod parser;
 mod renderer;
 mod typst;
 
-const PREFIX: &str = "/blog";
+pub const PREFIX: &str = "/blog";
 
 pub struct Blog {
     pub dist_dir: PathBuf,
@@ -18,7 +18,7 @@ impl Blog {
             .canonicalize()
             .with_context(|| format!("failed to canonicalize '{}'", root.display()))?;
         let posts_dir = root.join("posts");
-        let dist_dir = root.join("dist/blog");
+        let dist_dir = root.join("dist");
         let public_dir = root.join("public");
         let dist_public_dir = dist_dir.join("public");
         let mut blog = Self {

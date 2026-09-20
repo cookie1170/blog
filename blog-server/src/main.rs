@@ -1,3 +1,5 @@
+#![feature(trim_prefix_suffix)]
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
@@ -26,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| format!("failed to watch '{}'", blog.public_dir.display()))?;
     info!("watching {}", blog.public_dir.display());
 
-    let server = warp::serve(warp::fs::dir("dist"));
+    let server = warp::serve(warp::path(PREFIX.trim_prefix('/')).and(warp::fs::dir("dist")));
     tokio::select! {
         _ = async {
                 while let Some(event) = rx.recv().await {
@@ -58,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
 use std::net::SocketAddrV4;
 
 use anyhow::Context as _;
-use blog_compiler::Blog;
+use blog_compiler::{Blog, PREFIX};
 use notify::{EventKind, RecursiveMode, Watcher};
 use tracing::{error, info};
+use warp::Filter as _;
