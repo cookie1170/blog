@@ -217,26 +217,26 @@ svg [fill="#ffffff"] {
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: url(/public/fonts/PTSans-Regular.ttf) format("truetype");
+    src: url(/blog/public/fonts/PTSans-Regular.ttf) format("truetype");
 }
 @font-face {
     font-family: "PT Sans";
     font-style: italic;
     font-weight: 400;
     font-display: swap;
-    src: url(/public/fonts/PTSans-Italic.ttf) format("truetype");
+    src: url(/blog/public/fonts/PTSans-Italic.ttf) format("truetype");
 }
 @font-face {
     font-family: "PT Sans";
     font-style: italic;
     font-weight: 700;
     font-display: swap;
-    src: url(/public/fonts/PTSans-BoldItalic.ttf) format("truetype");
+    src: url(/blog/public/fonts/PTSans-BoldItalic.ttf) format("truetype");
 }
 @font-face {
     font-family: "PT Sans";
     font-style: normal;
     font-weight: 700;
     font-display: swap;
-    src: url(/public/fonts/PTSans-Bold.ttf) format("truetype");
+    src: url(/blog/public/fonts/PTSans-Bold.ttf) format("truetype");
 }

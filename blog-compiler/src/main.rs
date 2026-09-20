@@ -38,6 +38,8 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+const PREFIX: &str = "/blog";
+
 mod parser;
 mod renderer;
 mod typst;
@@ -58,7 +60,7 @@ impl Blog {
             .canonicalize()
             .with_context(|| format!("failed to canonicalize '{}'", root.display()))?;
         let posts_dir = root.join("posts");
-        let dist_dir = root.join("dist");
+        let dist_dir = root.join("dist/blog");
         let public_dir = root.join("public");
         let dist_public_dir = dist_dir.join("public");
         let mut blog = Self {

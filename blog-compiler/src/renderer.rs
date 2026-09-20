@@ -16,7 +16,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
-        <link href="/public/style.css" rel="stylesheet">
+        <link href="{PREFIX}/public/style.css" rel="stylesheet">
         <title>{title} -- Cookie's blog</title>
     </head>
     <body>
@@ -92,9 +92,9 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
                     <svg height="16px" width="16px" class="task-marker">{}</svg>
                 "#,
                     if state {
-                        r#"<use href="/public/check.svg#check"></use>"#
+                        format!(r#"<use href="{PREFIX}/public/check.svg#check"></use>"#)
                     } else {
-                        ""
+                        String::new()
                     }
                 ))?;
             }
@@ -390,7 +390,7 @@ pub fn render<O: io::Write>(source: &str, output: BufWriter<O>, bump: &Bump) -> 
 }
 
 use crate::{
-    PostMeta,
+    PREFIX, PostMeta,
     parser::{self, Event, ParseResult, Tag, TagEnd},
 };
 use anyhow::{Context, Result};
