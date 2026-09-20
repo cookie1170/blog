@@ -56,7 +56,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
         Ok(result)
     }
 
-    pub fn process_event(&mut self, event: Event<'i>) -> Result<()> {
+    pub async fn process_event(&mut self, event: Event<'i>) -> Result<()> {
         use Event as E;
         match event {
             E::Start(tag) => self.start_tag(tag)?,
@@ -69,13 +69,13 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
                 self.write("</code>")?;
             }
             E::InlineMath(math) => {
-                let result = self.typst.compile(&math).with_context(|| {
+                let result = self.typst.compile(&math).await.with_context(|| {
                     format!("failed to compile typst expression '{}'", math.trim())
                 })?;
                 self.write(result)?
             }
             E::DisplayMath(math) => {
-                let result = self.typst.compile(&math).with_context(|| {
+                let result = self.typst.compile(&math).await.with_context(|| {
                     format!("failed to compile typst expression '{}'", math.trim())
                 })?;
                 self.write("<p>")?;
@@ -369,7 +369,11 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
     }
 }
 
-pub fn render<O: io::Write>(source: &str, output: BufWriter<O>, bump: &Bump) -> Result<PostMeta> {
+pub async fn render<O: io::Write>(
+    source: &str,
+    output: BufWriter<O>,
+    bump: &Bump,
+) -> Result<PostMeta> {
     let ParseResult { root_meta, events } = parser::parse(source, bump)?;
     let events = events.into_iter();
     let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
@@ -383,7 +387,7 @@ pub fn render<O: io::Write>(source: &str, output: BufWriter<O>, bump: &Bump) -> 
 
     renderer.write_beginning_html()?;
     while let Some(event) = renderer.events.next() {
-        renderer.process_event(event)?;
+        renderer.process_event(event).await?;
     }
     renderer.write_ending_html()?;
     Ok(post_meta)

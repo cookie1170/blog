@@ -1,0 +1,63 @@
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
+
+    let path = std::env::current_dir().context("failed to get cwd")?;
+
+    let mut blog = Blog::new(path.into())?;
+
+    if let Err(e) = blog.recompile().await {
+        error!("{e:?}");
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut watcher = notify::recommended_watcher(move |event| {
+        let _ = tx.send(event);
+    })
+    .context("failed to intialise filesystem watcher")?;
+
+    watcher
+        .watch(&blog.posts_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.posts_dir.display()))?;
+    info!("watching {}", blog.posts_dir.display());
+
+    watcher
+        .watch(&blog.public_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.public_dir.display()))?;
+    info!("watching {}", blog.public_dir.display());
+
+    let server = warp::serve(warp::fs::dir("dist"));
+    tokio::select! {
+        _ = async {
+                while let Some(event) = rx.recv().await {
+                    let event = match event {
+                        Ok(event) => event,
+                        Err(e) => {
+                            error!("error when receiving notify event: {e}");
+                            continue;
+                        }
+                    };
+                    if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
+                        continue;
+                    }
+                    if let Err(e) = blog.recompile().await {
+                        error!("{e:?}");
+                    }
+                }
+        } => (),
+        _ = async {
+            let addr = "127.0.0.1:8000";
+            info!("serving at {addr}");
+            server.run(addr.parse::<SocketAddrV4>().unwrap()).await;
+        } => (),
+    };
+
+    Ok(())
+}
+
+use std::net::SocketAddrV4;
+
+use anyhow::Context as _;
+use blog_compiler::Blog;
+use notify::{EventKind, RecursiveMode, Watcher};
+use tracing::{error, info};

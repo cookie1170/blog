@@ -1,55 +1,17 @@
 #![feature(allocator_api)]
 
-fn main() -> anyhow::Result<()> {
-    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
-
-    let path = std::env::current_dir().context("failed to get cwd")?;
-
-    let mut blog = Blog::new(path.into())?;
-
-    if let Err(e) = blog.recompile() {
-        error!("{e:?}");
-    }
-
-    let (tx, rx) = mpsc::channel();
-    let mut watcher =
-        notify::recommended_watcher(tx).context("failed to intialise filesystem watcher")?;
-
-    watcher
-        .watch(&blog.posts_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.posts_dir.display()))?;
-    info!("watching {}", blog.posts_dir.display());
-
-    watcher
-        .watch(&blog.public_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.public_dir.display()))?;
-    info!("watching {}", blog.public_dir.display());
-
-    for event in rx {
-        let event = event.context("failed to receive notify event")?;
-        if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
-            continue;
-        }
-        if let Err(e) = blog.recompile() {
-            error!("{e:?}");
-        }
-    }
-
-    Ok(())
-}
-
-const PREFIX: &str = "/blog";
-
 mod parser;
 mod renderer;
 mod typst;
 
+const PREFIX: &str = "/blog";
+
 #[derive(Debug)]
 pub struct Blog {
-    dist_dir: PathBuf,
-    posts_dir: PathBuf,
-    public_dir: PathBuf,
-    dist_public_dir: PathBuf,
+    pub dist_dir: PathBuf,
+    pub posts_dir: PathBuf,
+    pub public_dir: PathBuf,
+    pub dist_public_dir: PathBuf,
     posts: Vec<Post>,
     bump: Bump,
 }
@@ -77,7 +39,9 @@ impl Blog {
 
     pub fn update_posts(&mut self) -> anyhow::Result<()> {
         self.posts.clear();
-        for post in fs::read_dir(&self.posts_dir).context("failed to read posts")? {
+        for post in fs::read_dir(&self.posts_dir)
+            .with_context(|| format!("failed to read {}", self.posts_dir.display()))?
+        {
             let post = post.context("failed to read post")?;
             if !post
                 .metadata()
@@ -93,7 +57,7 @@ impl Blog {
         Ok(())
     }
 
-    pub fn recompile(&mut self) -> anyhow::Result<()> {
+    pub async fn recompile(&mut self) -> anyhow::Result<()> {
         let _ = fs::remove_dir_all(&self.dist_public_dir);
         dircpy::CopyBuilder::new(&self.public_dir, &self.dist_public_dir)
             .overwrite(true)
@@ -117,6 +81,7 @@ impl Blog {
             })?;
             self.bump.reset();
             post.compile(&output_path, &self.bump)
+                .await
                 .with_context(|| format!("failed to compile post {}", post.name))?;
         }
 
@@ -151,7 +116,7 @@ impl Post {
         Ok(Self { name, path })
     }
 
-    pub fn compile(&self, output_path: &Path, bump: &Bump) -> Result<()> {
+    pub async fn compile(&self, output_path: &Path, bump: &Bump) -> Result<()> {
         let markdown = self.path.join(&self.name).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
@@ -174,7 +139,9 @@ impl Post {
 
         let out_html = BufWriter::new(out_html);
 
-        renderer::render(&markdown, out_html, bump).context("failed to render html")?;
+        renderer::render(&markdown, out_html, bump)
+            .await
+            .context("failed to render html")?;
 
         let images_path = self.path.join("images");
         let dist_images_path = output_path.join("images");
@@ -214,12 +181,10 @@ impl Post {
 use anyhow::{Context, Result};
 use bumpalo::Bump;
 use jiff::civil::Date;
-use notify::{EventKind, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::{
     fs::{self, OpenOptions},
     io::BufWriter,
     path::{Path, PathBuf},
-    sync::mpsc,
 };
 use tracing::*;

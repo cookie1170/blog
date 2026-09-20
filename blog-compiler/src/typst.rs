@@ -6,7 +6,7 @@ impl TypstCompiler {
         Self {}
     }
 
-    pub fn compile(&mut self, math_expr: &str) -> Result<Vec<u8>> {
+    pub async fn compile(&mut self, math_expr: &str) -> Result<Vec<u8>> {
         let mut typst = Command::new("typst")
             .arg("compile")
             .arg("-")
@@ -24,14 +24,15 @@ impl TypstCompiler {
             .take()
             .context("typst process should have stdin handle")?;
 
-        stdin.write_fmt(format_args!(
+        stdin.write(format!(
             r#"#set page(width: auto, height: auto, margin: 0cm); #show math.equation: set text(font: "Fira Math"); $ {math_expr} $"#
-        ))?;
-        stdin.flush()?;
+        ).as_bytes()).await?;
+        stdin.flush().await?;
         typst.stdin = Some(stdin);
 
         let output = typst
             .wait_with_output()
+            .await
             .context("failed to wait on typst process")?;
 
         if !output.status.success() {
@@ -42,9 +43,7 @@ impl TypstCompiler {
     }
 }
 
-use std::{
-    io::Write,
-    process::{Command, Stdio},
-};
+use std::process::Stdio;
+use tokio::{io::AsyncWriteExt, process::Command};
 
 use anyhow::{Context, Result, bail};
