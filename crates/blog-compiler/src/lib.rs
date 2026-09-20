@@ -71,15 +71,7 @@ impl Blog {
 
         for post in &mut self.posts {
             let output_path = self.dist_dir.join(&post.name);
-            let _ = fs::remove_dir(&output_path);
-            fs::create_dir_all(&output_path).with_context(|| {
-                format!(
-                    "failed to create output directory '{}'",
-                    output_path.display()
-                )
-            })?;
-            let output_path = output_path.clone();
-            post.compile(output_path)
+            post.compile(&output_path)
                 .with_context(|| format!("failed to compile post {}", post.name))?;
         }
 
@@ -120,20 +112,27 @@ impl Post {
         })
     }
 
-    pub fn compile(&mut self, output_path: PathBuf) -> Result<()> {
+    pub fn compile(&mut self, output_path: &Path) -> Result<Option<PostMeta>> {
+        let hash = self.compute_hash().context("failed to compute post hash")?;
+        let hash_path = output_path.join("hash.sha256");
+        let last_hash = self.get_last_hash(&hash_path);
+        if last_hash.is_ok_and(|h| hash == h) {
+            return Ok(None);
+        }
+        info!("compiling post '{}'", self.name);
+
+        let _ = fs::remove_dir_all(&output_path);
+        fs::create_dir_all(&output_path).with_context(|| {
+            format!(
+                "failed to create output directory '{}'",
+                output_path.display()
+            )
+        })?;
+
         let markdown = self.path.join(&self.name).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
 
-        let hash = self.get_current_hash(&markdown);
-        let hash_path = output_path.join("hash.sha256");
-        let last_hash = self.get_last_hash(&hash_path);
-        if last_hash.is_ok_and(|h| hash == h) {
-            return Ok(());
-        }
-        let _ = fs::remove_file(&hash_path);
-
-        info!("compiling post '{}'", self.name);
         let html_path = output_path.join("index.html");
         let out_html = OpenOptions::new()
             .write(true)
@@ -144,7 +143,8 @@ impl Post {
 
         let out_html = BufWriter::new(out_html);
 
-        self.renderer
+        let meta = self
+            .renderer
             .render(&markdown, out_html)
             .context("failed to render html")?;
 
@@ -165,13 +165,28 @@ impl Post {
         fs::write(&hash_path, hash)
             .with_context(|| format!("failed to write hash to {}", hash_path.display()))?;
 
-        info!("finished compiling post '{}'", self.name);
-
-        Ok(())
+        Ok(Some(meta))
     }
 
-    pub fn get_current_hash(&self, markdown: &str) -> [u8; 32] {
-        openssl::sha::sha256(markdown.as_bytes())
+    pub fn compute_hash(&self) -> Result<[u8; 32]> {
+        let mut hasher = Sha256::new();
+        let mut buf = Vec::with_capacity(1024);
+
+        for entry in WalkDir::new(&self.path) {
+            let entry = entry.context("error when walking post directory")?;
+            hasher.update(entry.path().as_os_str().as_bytes());
+            if entry.file_type().is_file() {
+                buf.clear();
+                let mut reader = File::open(entry.path())
+                    .with_context(|| format!("failed to open {}", entry.path().display()))?;
+                reader
+                    .read_to_end(&mut buf)
+                    .with_context(|| format!("failed to read {}", entry.path().display()))?;
+                hasher.update(&buf);
+            }
+        }
+
+        Ok(hasher.finish())
     }
 
     pub fn get_last_hash(&self, hash_path: &Path) -> Result<[u8; 32]> {
@@ -185,12 +200,15 @@ impl Post {
 
 use anyhow::{Context, Result};
 use jiff::civil::Date;
+use openssl::sha::Sha256;
 use serde::Deserialize;
 use std::{
-    fs::{self, OpenOptions},
-    io::BufWriter,
+    fs::{self, File, OpenOptions},
+    io::{BufWriter, Read},
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 use tracing::*;
+use walkdir::WalkDir;
 
 use crate::renderer::Renderer;

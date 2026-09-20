@@ -33,7 +33,7 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
                             continue;
                         }
                     };
-                    if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
+                    if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..) | EventKind::Remove(..)) {
                         continue;
                     }
                     if let Err(e) = blog.recompile(false) {
