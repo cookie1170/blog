@@ -16,7 +16,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
-        <link href="/static/style.css" rel="stylesheet">
+        <link href="/public/style.css" rel="stylesheet">
         <title>{title} -- Cookie's blog</title>
     </head>
     <body>
@@ -92,7 +92,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
                     <svg height="16px" width="16px" class="task-marker">{}</svg>
                 "#,
                     if state {
-                        r#"<use href="/static/check.svg#check"></use>"#
+                        r#"<use href="/public/check.svg#check"></use>"#
                     } else {
                         ""
                     }

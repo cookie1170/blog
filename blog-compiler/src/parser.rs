@@ -192,15 +192,20 @@ impl<'i, 'b> Parser<'i, 'b> {
             }
             CTag::TableHead => {
                 self.is_table_header = true;
+                self.current_cell_index = 0;
                 self.events().push(Event::Start(Tag::TableHead));
             }
-            CTag::TableRow => self.events().push(Event::Start(Tag::TableRow)),
+            CTag::TableRow => {
+                self.current_cell_index = 0;
+                self.events().push(Event::Start(Tag::TableRow));
+            }
             CTag::TableCell => {
                 let alignment = self
                     .current_alignments
                     .get(self.current_cell_index)
                     .copied()
                     .unwrap_or(Alignment::None);
+                self.current_cell_index += 1;
                 if self.is_table_header {
                     self.events()
                         .push(Event::Start(Tag::TableHeadCell(alignment)));

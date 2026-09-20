@@ -21,9 +21,9 @@ fn main() -> anyhow::Result<()> {
     info!("watching {}", blog.posts_dir.display());
 
     watcher
-        .watch(&blog.static_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.static_dir.display()))?;
-    info!("watching {}", blog.static_dir.display());
+        .watch(&blog.public_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.public_dir.display()))?;
+    info!("watching {}", blog.public_dir.display());
 
     for event in rx {
         let event = event.context("failed to receive notify event")?;
@@ -46,8 +46,8 @@ mod typst;
 pub struct Blog {
     dist_dir: PathBuf,
     posts_dir: PathBuf,
-    static_dir: PathBuf,
-    dist_static_dir: PathBuf,
+    public_dir: PathBuf,
+    dist_public_dir: PathBuf,
     posts: Vec<Post>,
     bump: Bump,
 }
@@ -59,13 +59,13 @@ impl Blog {
             .with_context(|| format!("failed to canonicalize '{}'", root.display()))?;
         let posts_dir = root.join("posts");
         let dist_dir = root.join("dist");
-        let static_dir = root.join("static");
-        let dist_static_dir = dist_dir.join("static");
+        let public_dir = root.join("public");
+        let dist_public_dir = dist_dir.join("public");
         let mut blog = Self {
             posts_dir,
             dist_dir,
-            static_dir,
-            dist_static_dir,
+            public_dir,
+            dist_public_dir,
             posts: Vec::new(),
             bump: Bump::with_capacity(65536),
         };
@@ -92,15 +92,15 @@ impl Blog {
     }
 
     pub fn recompile(&mut self) -> anyhow::Result<()> {
-        let _ = fs::remove_dir_all(&self.dist_static_dir);
-        dircpy::CopyBuilder::new(&self.static_dir, &self.dist_static_dir)
+        let _ = fs::remove_dir_all(&self.dist_public_dir);
+        dircpy::CopyBuilder::new(&self.public_dir, &self.dist_public_dir)
             .overwrite(true)
             .run()
             .with_context(|| {
                 format!(
                     "failed to copy '{}' to '{}'",
-                    self.static_dir.display(),
-                    self.dist_static_dir.display()
+                    self.public_dir.display(),
+                    self.dist_public_dir.display()
                 )
             })?;
 

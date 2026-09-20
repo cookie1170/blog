@@ -12,7 +12,7 @@ impl TypstCompiler {
             .arg("-")
             .arg("-")
             .args(["--format", "svg"])
-            .args(["--font-path", "dist/static/fonts"])
+            .args(["--font-path", "dist/public/fonts"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
