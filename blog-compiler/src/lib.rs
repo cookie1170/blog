@@ -1,5 +1,3 @@
-#![feature(allocator_api)]
-
 mod parser;
 mod renderer;
 mod typst;
@@ -13,7 +11,6 @@ pub struct Blog {
     pub public_dir: PathBuf,
     pub dist_public_dir: PathBuf,
     posts: Vec<Post>,
-    bump: Bump,
 }
 
 impl Blog {
@@ -31,7 +28,6 @@ impl Blog {
             public_dir,
             dist_public_dir,
             posts: Vec::new(),
-            bump: Bump::with_capacity(65536),
         };
         blog.update_posts()?;
         Ok(blog)
@@ -79,8 +75,8 @@ impl Blog {
                     output_path.display()
                 )
             })?;
-            self.bump.reset();
-            post.compile(&output_path, &self.bump)
+            let output_path = output_path.clone();
+            post.compile(output_path)
                 .await
                 .with_context(|| format!("failed to compile post {}", post.name))?;
         }
@@ -89,7 +85,7 @@ impl Blog {
     }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Post {
     name: String,
     path: PathBuf,
@@ -116,7 +112,7 @@ impl Post {
         Ok(Self { name, path })
     }
 
-    pub async fn compile(&self, output_path: &Path, bump: &Bump) -> Result<()> {
+    pub async fn compile(&self, output_path: PathBuf) -> Result<()> {
         let markdown = self.path.join(&self.name).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
@@ -139,7 +135,7 @@ impl Post {
 
         let out_html = BufWriter::new(out_html);
 
-        renderer::render(&markdown, out_html, bump)
+        renderer::render(&markdown, out_html)
             .await
             .context("failed to render html")?;
 
@@ -179,7 +175,6 @@ impl Post {
 }
 
 use anyhow::{Context, Result};
-use bumpalo::Bump;
 use jiff::civil::Date;
 use serde::Deserialize;
 use std::{

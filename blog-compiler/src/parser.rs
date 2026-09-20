@@ -1,28 +1,27 @@
-pub struct ParseResult<'i, 'b> {
+pub struct ParseResult<'i> {
     pub root_meta: CowStr<'i>,
-    pub events: Vec<Event<'i>, &'b Bump>,
+    pub events: Vec<Event<'i>>,
 }
 
 #[derive(Debug)]
-struct Footnote<'i, 'b> {
+struct Footnote<'i> {
     number: usize,
-    events: Vec<Event<'i>, &'b Bump>,
+    events: Vec<Event<'i>>,
 }
 
-struct Parser<'i, 'b> {
-    events: Vec<Event<'i>, &'b Bump>,
-    footnotes: HashMap<CowStr<'i>, Footnote<'i, 'b>, RandomState, &'b Bump>,
-    current_footnote: Option<(CowStr<'i>, Footnote<'i, 'b>)>,
+struct Parser<'i> {
+    events: Vec<Event<'i>>,
+    footnotes: HashMap<CowStr<'i>, Footnote<'i>>,
+    current_footnote: Option<(CowStr<'i>, Footnote<'i>)>,
     current_alignments: Vec<Alignment>,
     current_metadata_block: String,
     current_cell_index: usize,
     is_table_header: bool,
     in_metadata_block: bool,
     ignore: bool,
-    bump: &'b Bump,
 }
 
-pub fn parse<'i, 'b>(source: &'i str, bump: &'b Bump) -> Result<ParseResult<'i, 'b>> {
+pub fn parse<'i>(source: &'i str) -> Result<ParseResult<'i>> {
     let options = Options::ENABLE_GFM
         | Options::ENABLE_MATH
         | Options::ENABLE_TABLES
@@ -47,14 +46,14 @@ pub fn parse<'i, 'b>(source: &'i str, bump: &'b Bump) -> Result<ParseResult<'i, 
         bail!("expected plus-delimited metadata block at the start");
     }
 
-    let mut events = Vec::with_capacity_in(1024, bump);
+    let mut events = Vec::with_capacity(1024);
     // HACK: we wrap all the events in `Option` so that we can move out of them
     // in `scan_footnotes` or for `process_events` separately. the set of events will not overlap
     events.extend(cmark_parser.map(Some));
 
     let mut parser = Parser {
-        events: Vec::with_capacity_in(1024, bump),
-        footnotes: HashMap::with_capacity_in(8, bump),
+        events: Vec::with_capacity(1024),
+        footnotes: HashMap::with_capacity(8),
         current_footnote: None,
         current_alignments: Vec::default(),
         current_cell_index: 0,
@@ -62,7 +61,6 @@ pub fn parse<'i, 'b>(source: &'i str, bump: &'b Bump) -> Result<ParseResult<'i, 
         in_metadata_block: false,
         current_metadata_block: String::new(),
         ignore: false,
-        bump,
     };
 
     let mut iter = events.iter_mut();
@@ -90,7 +88,7 @@ pub fn parse<'i, 'b>(source: &'i str, bump: &'b Bump) -> Result<ParseResult<'i, 
     })
 }
 
-impl<'i, 'b> Parser<'i, 'b> {
+impl<'i> Parser<'i> {
     fn scan_footnotes(&mut self, event: &mut Option<CE<'i>>) -> Result<()> {
         match event {
             Some(CE::Start(CTag::FootnoteDefinition(name))) => {
@@ -98,7 +96,7 @@ impl<'i, 'b> Parser<'i, 'b> {
                     name.clone(),
                     Footnote {
                         number: self.footnotes.len() + 1,
-                        events: Vec::with_capacity_in(128, self.bump),
+                        events: Vec::with_capacity(128),
                     },
                 ));
             }
@@ -307,7 +305,7 @@ impl<'i, 'b> Parser<'i, 'b> {
         }
     }
 
-    fn events(&mut self) -> &mut Vec<Event<'i>, &'b Bump> {
+    fn events(&mut self) -> &mut Vec<Event<'i>> {
         match self.current_footnote {
             Some((_, ref mut f)) => &mut f.events,
             None => &mut self.events,
@@ -551,10 +549,9 @@ pub enum TagEnd {
     Link,
     Image,
 }
-use std::{collections::HashMap, hash::RandomState};
+use std::collections::HashMap;
 
 use anyhow::{Context as _, Result, bail};
-use bumpalo::Bump;
 use pulldown_cmark::{
     Alignment, BlockQuoteKind, CodeBlockKind, CowStr, Event as CE, HeadingLevel, LinkType,
     MetadataBlockKind, Options, Parser as CmarkParser, Tag as CTag, TagEnd as CTagEnd,

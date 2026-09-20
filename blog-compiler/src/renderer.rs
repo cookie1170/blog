@@ -1,13 +1,12 @@
 #[derive(Debug)]
-struct Renderer<'i, 'm, 'b, O: io::Write> {
-    events: IntoIter<Event<'i>, &'b Bump>,
+struct Renderer<'i, 'm, O: io::Write> {
+    events: IntoIter<Event<'i>>,
     post_meta: &'m PostMeta,
     output: IoWriter<BufWriter<O>>,
     typst: TypstCompiler,
-    bump: &'b Bump,
 }
 
-impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
+impl<'i, 'm, O: io::Write> Renderer<'i, 'm, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
         self.write_fmt(format_args!(
             r#"
@@ -30,7 +29,7 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
         "#,
             title = self.post_meta.title,
             date = self.post_meta.date.strftime("%d %B %Y"),
-            tags = String::from_utf8_lossy(&self.format_tags()?),
+            tags = self.format_tags()?,
         ))?;
         Ok(())
     }
@@ -47,8 +46,8 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
         Ok(())
     }
 
-    pub fn format_tags(&self) -> Result<Vec<u8, &'b Bump>> {
-        let mut result = Vec::with_capacity_in(64, self.bump);
+    pub fn format_tags(&self) -> Result<String> {
+        let mut result = String::with_capacity(64);
         for tag in &self.post_meta.tags {
             write!(&mut result, r#"<div class="tag">{}</div>"#, tag)?;
         }
@@ -369,12 +368,8 @@ impl<'i, 'm, 'b, O: io::Write> Renderer<'i, 'm, 'b, O> {
     }
 }
 
-pub async fn render<O: io::Write>(
-    source: &str,
-    output: BufWriter<O>,
-    bump: &Bump,
-) -> Result<PostMeta> {
-    let ParseResult { root_meta, events } = parser::parse(source, bump)?;
+pub async fn render<O: io::Write>(source: &str, output: BufWriter<O>) -> Result<PostMeta> {
+    let ParseResult { root_meta, events } = parser::parse(source)?;
     let events = events.into_iter();
     let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
     let mut renderer = Renderer {
@@ -382,7 +377,6 @@ pub async fn render<O: io::Write>(
         post_meta: &post_meta,
         output: IoWriter(output),
         typst: TypstCompiler::new(),
-        bump,
     };
 
     renderer.write_beginning_html()?;
@@ -398,9 +392,9 @@ use crate::{
     parser::{self, Event, ParseResult, Tag, TagEnd},
 };
 use anyhow::{Context, Result};
-use bumpalo::Bump;
 use pulldown_cmark::{Alignment, BlockQuoteKind, CodeBlockKind, LinkType};
 use pulldown_cmark_escape::IoWriter;
+use pulldown_cmark_escape::StrWrite;
 use std::{
     fmt,
     io::{self, BufWriter, Write},

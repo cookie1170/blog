@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
-bumpalo = { version = "3.20.3", features = ["allocator_api", "std"] }
 dircpy = "0.3.20"
 jiff = { version = "0.2.37", features = ["serde"] }
 openssl = "0.10.81"

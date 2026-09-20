@@ -6,7 +6,7 @@ impl TypstCompiler {
         Self {}
     }
 
-    pub async fn compile(&mut self, math_expr: &str) -> Result<Vec<u8>> {
+    pub async fn compile(&mut self, math_expr: &str) -> Result<String> {
         let mut typst = Command::new("typst")
             .arg("compile")
             .arg("-")
@@ -39,7 +39,7 @@ impl TypstCompiler {
             bail!("{}", String::from_utf8_lossy(&output.stderr));
         }
 
-        Ok(output.stdout)
+        Ok(String::from_utf8_lossy_owned(output.stdout))
     }
 }
 
