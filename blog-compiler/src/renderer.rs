@@ -1,12 +1,22 @@
-#[derive(Debug)]
-struct Renderer<'i, 'm, O: io::Write> {
-    events: IntoIter<Event<'i>>,
-    post_meta: &'m PostMeta,
-    output: IoWriter<BufWriter<O>>,
+pub struct Renderer {
     typst: TypstCompiler,
 }
 
-impl<'i, 'm, O: io::Write> Renderer<'i, 'm, O> {
+impl Renderer {
+    pub fn new() -> Self {
+        let typst = TypstCompiler::new();
+        Self { typst }
+    }
+}
+
+struct RendererInner<'i, 'm, 'r, O: io::Write> {
+    events: IntoIter<Event<'i>>,
+    post_meta: &'m PostMeta,
+    output: IoWriter<BufWriter<O>>,
+    outer: &'r mut Renderer,
+}
+
+impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
         self.write_fmt(format_args!(
             r#"
@@ -55,7 +65,7 @@ impl<'i, 'm, O: io::Write> Renderer<'i, 'm, O> {
         Ok(result)
     }
 
-    pub async fn process_event(&mut self, event: Event<'i>) -> Result<()> {
+    pub fn process_event(&mut self, event: Event<'i>) -> Result<()> {
         use Event as E;
         match event {
             E::Start(tag) => self.start_tag(tag)?,
@@ -68,15 +78,23 @@ impl<'i, 'm, O: io::Write> Renderer<'i, 'm, O> {
                 self.write("</code>")?;
             }
             E::InlineMath(math) => {
-                let result = self.typst.compile(&math).await.with_context(|| {
-                    format!("failed to compile typst expression '{}'", math.trim())
-                })?;
+                let result = self
+                    .outer
+                    .typst
+                    .compile(math.to_string())
+                    .with_context(|| {
+                        format!("failed to compile typst expression '{}'", math.trim())
+                    })?;
                 self.write(result)?
             }
             E::DisplayMath(math) => {
-                let result = self.typst.compile(&math).await.with_context(|| {
-                    format!("failed to compile typst expression '{}'", math.trim())
-                })?;
+                let result = self
+                    .outer
+                    .typst
+                    .compile(math.to_string())
+                    .with_context(|| {
+                        format!("failed to compile typst expression '{}'", math.trim())
+                    })?;
                 self.write("<p>")?;
                 self.write(result)?;
                 self.write("</p>")?;
@@ -368,23 +386,25 @@ impl<'i, 'm, O: io::Write> Renderer<'i, 'm, O> {
     }
 }
 
-pub async fn render<O: io::Write>(source: &str, output: BufWriter<O>) -> Result<PostMeta> {
-    let ParseResult { root_meta, events } = parser::parse(source)?;
-    let events = events.into_iter();
-    let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
-    let mut renderer = Renderer {
-        events,
-        post_meta: &post_meta,
-        output: IoWriter(output),
-        typst: TypstCompiler::new(),
-    };
+impl Renderer {
+    pub fn render<O: io::Write>(&mut self, source: &str, output: BufWriter<O>) -> Result<PostMeta> {
+        let ParseResult { root_meta, events } = parser::parse(source)?;
+        let events = events.into_iter();
+        let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
+        let mut renderer = RendererInner {
+            events,
+            post_meta: &post_meta,
+            output: IoWriter(output),
+            outer: self,
+        };
 
-    renderer.write_beginning_html()?;
-    while let Some(event) = renderer.events.next() {
-        renderer.process_event(event).await?;
+        renderer.write_beginning_html()?;
+        while let Some(event) = renderer.events.next() {
+            renderer.process_event(event)?;
+        }
+        renderer.write_ending_html()?;
+        Ok(post_meta)
     }
-    renderer.write_ending_html()?;
-    Ok(post_meta)
 }
 
 use crate::{

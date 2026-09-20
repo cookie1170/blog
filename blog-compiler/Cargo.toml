@@ -11,6 +11,9 @@ openssl = "0.10.81"
 pulldown-cmark = { version = "0.13.4", features = ["simd"] }
 pulldown-cmark-escape = { version = "0.11.0", features = ["simd"] }
 serde = { version = "1.0.229", features = ["derive"] }
-tokio = { version = "1.53.1", features = ["full"] }
 toml = "1.1.6"
 tracing = "0.1.44"
+typst = "0.15.1"
+typst-kit = "0.15.1"
+typst-layout = "0.15.1"
+typst-svg = "0.15.1"

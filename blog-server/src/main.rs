@@ -6,7 +6,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut blog = Blog::new(path.into())?;
 
-    if let Err(e) = blog.recompile().await {
+    if let Err(e) = blog.recompile() {
         error!("{e:?}");
     }
 
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
                     if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
                         continue;
                     }
-                    if let Err(e) = blog.recompile().await {
+                    if let Err(e) = blog.recompile(){
                         error!("{e:?}");
                     }
                 }

@@ -4,7 +4,6 @@ mod typst;
 
 const PREFIX: &str = "/blog";
 
-#[derive(Debug)]
 pub struct Blog {
     pub dist_dir: PathBuf,
     pub posts_dir: PathBuf,
@@ -53,7 +52,7 @@ impl Blog {
         Ok(())
     }
 
-    pub async fn recompile(&mut self) -> anyhow::Result<()> {
+    pub fn recompile(&mut self) -> anyhow::Result<()> {
         let _ = fs::remove_dir_all(&self.dist_public_dir);
         dircpy::CopyBuilder::new(&self.public_dir, &self.dist_public_dir)
             .overwrite(true)
@@ -66,7 +65,7 @@ impl Blog {
                 )
             })?;
 
-        for post in &self.posts {
+        for post in &mut self.posts {
             let output_path = self.dist_dir.join(&post.name);
             let _ = fs::remove_dir(&output_path);
             fs::create_dir_all(&output_path).with_context(|| {
@@ -77,7 +76,6 @@ impl Blog {
             })?;
             let output_path = output_path.clone();
             post.compile(output_path)
-                .await
                 .with_context(|| format!("failed to compile post {}", post.name))?;
         }
 
@@ -85,10 +83,10 @@ impl Blog {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
 pub struct Post {
     name: String,
     path: PathBuf,
+    renderer: Renderer,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone)]
@@ -109,10 +107,16 @@ impl Post {
             .to_string_lossy()
             .into_owned();
 
-        Ok(Self { name, path })
+        let renderer = Renderer::new();
+
+        Ok(Self {
+            name,
+            path,
+            renderer,
+        })
     }
 
-    pub async fn compile(&self, output_path: PathBuf) -> Result<()> {
+    pub fn compile(&mut self, output_path: PathBuf) -> Result<()> {
         let markdown = self.path.join(&self.name).with_extension("md");
         let markdown = fs::read_to_string(&markdown)
             .with_context(|| format!("failed to read '{}'", markdown.display()))?;
@@ -123,6 +127,7 @@ impl Post {
         if last_hash.is_ok_and(|h| hash == h) {
             return Ok(());
         }
+        let _ = fs::remove_file(&hash_path);
 
         info!("compiling post '{}'", self.name);
         let html_path = output_path.join("index.html");
@@ -135,8 +140,8 @@ impl Post {
 
         let out_html = BufWriter::new(out_html);
 
-        renderer::render(&markdown, out_html)
-            .await
+        self.renderer
+            .render(&markdown, out_html)
             .context("failed to render html")?;
 
         let images_path = self.path.join("images");
@@ -183,3 +188,5 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::*;
+
+use crate::renderer::Renderer;
