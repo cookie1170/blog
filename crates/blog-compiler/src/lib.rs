@@ -52,7 +52,11 @@ impl Blog {
         Ok(())
     }
 
-    pub fn recompile(&mut self) -> anyhow::Result<()> {
+    pub fn recompile(&mut self, clean: bool) -> anyhow::Result<()> {
+        if clean {
+            let _ = fs::remove_dir_all(&self.dist_dir);
+        }
+
         let _ = fs::remove_dir_all(&self.dist_public_dir);
         dircpy::CopyBuilder::new(&self.public_dir, &self.dist_public_dir)
             .overwrite(true)

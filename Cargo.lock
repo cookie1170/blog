@@ -146,6 +146,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "blog"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blog-compiler",
+ "blog-server",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "blog-compiler"
 version = "0.1.0"
 dependencies = [

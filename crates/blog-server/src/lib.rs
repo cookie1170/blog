@@ -1,14 +1,8 @@
 #![feature(trim_prefix_suffix)]
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
-
-    let path = std::env::current_dir().context("failed to get cwd")?;
-
-    let mut blog = Blog::new(path.into())?;
-
-    if let Err(e) = blog.recompile() {
+pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
+    if let Err(e) = blog.recompile(false) {
         error!("{e:?}");
     }
 
@@ -42,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
                     if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..)) {
                         continue;
                     }
-                    if let Err(e) = blog.recompile(){
+                    if let Err(e) = blog.recompile(false) {
                         error!("{e:?}");
                     }
                 }
