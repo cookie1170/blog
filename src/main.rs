@@ -11,11 +11,14 @@ fn main() -> anyhow::Result<()> {
                 _ => bail!("`serve` cargo feature must be enabled to use `serve`!"),
             }
         }
-        Some(deref!("compile")) => blog.recompile(true),
+        Some(deref!("compile")) => blog.recompile(CompileOptions {
+            dev: false,
+            clean: true,
+        }),
         Some(other) => bail!("unknown action: '{other}'"),
         None => bail!("expected action argument"),
     }
 }
 
 use anyhow::{Context, bail};
-use blog_compiler::Blog;
+use blog_compiler::{Blog, CompileOptions};

@@ -15,6 +15,7 @@ struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
     output: IoWriter<BufWriter<O>>,
     outer: &'r mut Renderer,
     slug: &'s str,
+    dev: bool,
 }
 
 impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
@@ -26,8 +27,9 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
-        <link href="{PREFIX}/public/style.css" rel="stylesheet">
+        <link href="{PREFIX}/public/style.css" rel="stylesheet" />
         <title>{title} -- Cookie's blog</title>
+        {dev_script}
     </head>
     <body>
         <div class="post">
@@ -41,6 +43,11 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
             title = self.post_meta.title,
             date = self.post_meta.date.strftime("%d %B %Y"),
             tags = self.format_tags()?,
+            dev_script = if self.dev {
+                format!(r#"<script src="{}/dev_public/reload.js"></script>"#, PREFIX)
+            } else {
+                String::new()
+            }
         ))?;
         Ok(())
     }
@@ -396,6 +403,7 @@ impl Renderer {
         source: &str,
         slug: &str,
         output: BufWriter<O>,
+        dev: bool,
     ) -> Result<PostMeta> {
         let ParseResult { root_meta, events } = parser::parse(source)?;
         let events = events.into_iter();
@@ -406,6 +414,7 @@ impl Renderer {
             output: IoWriter(output),
             outer: self,
             slug,
+            dev,
         };
 
         renderer.write_beginning_html()?;

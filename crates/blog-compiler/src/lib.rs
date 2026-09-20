@@ -12,25 +12,35 @@ pub struct Blog {
     pub posts_dir: PathBuf,
     pub public_dir: PathBuf,
     pub dist_public_dir: PathBuf,
+    pub dev_public_dir: PathBuf,
+    pub dist_dev_public_dir: PathBuf,
+    pub root_dir: PathBuf,
     copy_public_dir: Processor<CopyDir>,
+    copy_dev_public_dir: Processor<CopyDir>,
     posts: Vec<Processor<Post>>,
 }
 
 impl Blog {
-    pub fn new(root: PathBuf) -> anyhow::Result<Self> {
-        let root = root
+    pub fn new(root_dir: PathBuf) -> anyhow::Result<Self> {
+        let root_dir = root_dir
             .canonicalize()
-            .with_context(|| format!("failed to canonicalize '{}'", root.display()))?;
-        let posts_dir = root.join("posts");
-        let dist_dir = root.join("dist");
-        let public_dir = root.join("public");
+            .with_context(|| format!("failed to canonicalize '{}'", root_dir.display()))?;
+        let posts_dir = root_dir.join("posts");
+        let dist_dir = root_dir.join("dist");
+        let public_dir = root_dir.join("public");
         let dist_public_dir = dist_dir.join("public");
+        let dev_public_dir = root_dir.join("dev_public");
+        let dist_dev_public_dir = dist_dir.join("dev_public");
         let mut blog = Self {
+            root_dir,
             posts_dir,
             dist_dir,
             public_dir,
             dist_public_dir,
+            dev_public_dir,
+            dist_dev_public_dir,
             copy_public_dir: Processor::new(CopyDir),
+            copy_dev_public_dir: Processor::new(CopyDir),
             posts: Vec::new(),
         };
         blog.update_posts()?;
@@ -62,23 +72,33 @@ impl Blog {
         Ok(())
     }
 
-    pub fn recompile(&mut self, clean: bool) -> anyhow::Result<()> {
-        if clean {
+    pub fn recompile(&mut self, opts: CompileOptions) -> anyhow::Result<()> {
+        if opts.clean {
             let _ = fs::remove_dir_all(&self.dist_dir);
         }
 
         self.copy_public_dir
             .run(&self.public_dir, &self.dist_public_dir)?;
 
+        if opts.dev {
+            self.copy_dev_public_dir
+                .run(&self.dev_public_dir, &self.dist_dev_public_dir)?;
+        }
+
         for post in &mut self.posts {
             let output_path = self.dist_dir.join(&post.process.slug);
             let input_path = self.posts_dir.join(&post.process.slug);
-            post.run(&input_path, &output_path)
+            post.run_with(opts.dev, &input_path, &output_path)
                 .with_context(|| format!("failed to compile post at {}", input_path.display()))?;
         }
 
         Ok(())
     }
+}
+
+pub struct CompileOptions {
+    pub dev: bool,
+    pub clean: bool,
 }
 
 pub struct Post {
@@ -108,8 +128,9 @@ impl Post {
 
 impl Process for Post {
     type Output = PostMeta;
+    type Input = bool;
 
-    fn execute(&mut self, in_path: &Path, out_path: &Path) -> Result<PostMeta> {
+    fn execute(&mut self, dev: &bool, in_path: &Path, out_path: &Path) -> Result<PostMeta> {
         info!("compiling post '{}'", self.slug);
 
         let markdown = in_path.join(&self.slug).with_extension("md");
@@ -128,7 +149,7 @@ impl Process for Post {
 
         let meta = self
             .renderer
-            .render(&markdown, &self.slug, out_html)
+            .render(&markdown, &self.slug, out_html, *dev)
             .context("failed to render html")?;
 
         let images_path = in_path.join("images");

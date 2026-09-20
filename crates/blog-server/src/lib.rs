@@ -2,7 +2,10 @@
 
 #[tokio::main]
 pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
-    if let Err(e) = blog.recompile(false) {
+    if let Err(e) = blog.recompile(CompileOptions {
+        dev: true,
+        clean: false,
+    }) {
         error!("{e:?}");
     }
 
@@ -13,14 +16,9 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
     .context("failed to intialise filesystem watcher")?;
 
     watcher
-        .watch(&blog.posts_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.posts_dir.display()))?;
-    info!("watching {}", blog.posts_dir.display());
-
-    watcher
-        .watch(&blog.public_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.public_dir.display()))?;
-    info!("watching {}", blog.public_dir.display());
+        .watch(&blog.root_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.root_dir.display()))?;
+    info!("watching {}", blog.root_dir.display());
 
     let server = warp::serve(warp::path(PREFIX.trim_prefix('/')).and(warp::fs::dir("dist")));
     tokio::select! {
@@ -36,7 +34,10 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
                     if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..) | EventKind::Remove(..)) {
                         continue;
                     }
-                    if let Err(e) = blog.recompile(false) {
+                    if event.paths.iter().any(|p| p.starts_with(&blog.dist_dir)) {
+                        continue;
+                    }
+                    if let Err(e) = blog.recompile(CompileOptions { dev: true, clean: false }) {
                         error!("{e:?}");
                     }
                 }
@@ -54,7 +55,7 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
 use std::net::SocketAddrV4;
 
 use anyhow::Context as _;
-use blog_compiler::{Blog, PREFIX};
+use blog_compiler::{Blog, CompileOptions, PREFIX};
 use notify::{EventKind, RecursiveMode, Watcher};
 use tracing::{error, info};
 use warp::Filter as _;
