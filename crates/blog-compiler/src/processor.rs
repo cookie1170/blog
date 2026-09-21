@@ -9,12 +9,10 @@ pub trait Process {
     type Output: Debug = ();
     type Input: PartialEq + Debug = ();
 
-    fn execute(
-        &mut self,
-        input: &Self::Input,
-        in_path: &Path,
-        out_path: &Path,
-    ) -> Result<Self::Output>;
+    fn execute(&mut self, input: &Self::Input) -> Result<Self::Output>;
+
+    fn in_path(&self) -> &Path;
+    fn out_path(&self) -> &Path;
 }
 
 impl<P: Process> Processor<P> {
@@ -26,14 +24,9 @@ impl<P: Process> Processor<P> {
         }
     }
 
-    pub fn run_with(
-        &mut self,
-        input: P::Input,
-        in_path: impl AsRef<Path>,
-        out_path: impl AsRef<Path>,
-    ) -> Result<&P::Output> {
-        let in_path = in_path.as_ref();
-        let out_path = out_path.as_ref();
+    pub fn run_with(&mut self, input: P::Input) -> Result<&P::Output> {
+        let in_path = self.process.in_path();
+        let out_path = self.process.out_path();
         let current_hash = hash_directory(in_path, &[&out_path])
             .with_context(|| format!("failed to hash '{}'", in_path.display()))?;
         let hash_path = out_path.join("hash.txt");
@@ -51,7 +44,7 @@ impl<P: Process> Processor<P> {
         fs::create_dir_all(&out_path)
             .with_context(|| format!("failed to create '{}'", out_path.display()))?;
 
-        let out = self.process.execute(&input, in_path, out_path)?;
+        let out = self.process.execute(&input)?;
 
         fs::write(&hash_path, current_hash)
             .with_context(|| format!("failed to write hash to '{}'", hash_path.display()))?;
@@ -63,12 +56,8 @@ impl<P: Process> Processor<P> {
 }
 
 impl<P: Process<Input = ()>> Processor<P> {
-    pub fn run(
-        &mut self,
-        in_path: impl AsRef<Path>,
-        out_path: impl AsRef<Path>,
-    ) -> Result<&P::Output> {
-        self.run_with((), in_path, out_path)
+    pub fn run(&mut self) -> Result<&P::Output> {
+        self.run_with(())
     }
 }
 
@@ -129,22 +118,41 @@ fn hash_to_string(hash: [u8; 32]) -> String {
     hash.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-pub struct CopyDir;
+#[derive(PartialEq, Debug, Clone)]
+pub struct CopyDir {
+    pub in_path: PathBuf,
+    pub out_path: PathBuf,
+}
+
+#[macro_export]
+macro_rules! paths {
+    () => {
+        fn in_path(&self) -> &Path {
+            &self.in_path
+        }
+
+        fn out_path(&self) -> &Path {
+            &self.out_path
+        }
+    };
+}
 
 impl Process for CopyDir {
-    fn execute(&mut self, _: &(), in_path: &Path, out_path: &Path) -> Result<Self::Output> {
-        let _ = fs::remove_dir_all(out_path);
-        dircpy::CopyBuilder::new(in_path, out_path)
+    fn execute(&mut self, _: &()) -> Result<Self::Output> {
+        let _ = fs::remove_dir_all(&self.out_path);
+        dircpy::CopyBuilder::new(&self.in_path, &self.out_path)
             .overwrite(true)
             .run()
             .with_context(|| {
                 format!(
                     "failed to copy '{}' to '{}'",
-                    in_path.display(),
-                    out_path.display()
+                    self.in_path.display(),
+                    self.out_path.display()
                 )
             })
     }
+
+    paths! {}
 }
 
 use anyhow::{Context as _, Result};
@@ -154,6 +162,6 @@ use std::{
     fs::{self, File},
     io::{ErrorKind, Read as _},
     ops::{Deref, DerefMut},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use walkdir::WalkDir;

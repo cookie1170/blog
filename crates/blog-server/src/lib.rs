@@ -1,19 +1,11 @@
 #![feature(trim_prefix_suffix)]
 
 #[tokio::main]
-pub async fn serve(
-    blog: &mut Processor<Blog>,
-    in_path: &Path,
-    out_path: &Path,
-) -> anyhow::Result<()> {
-    if let Err(e) = blog.run_with(
-        CompileOptions {
-            dev: true,
-            clean: false,
-        },
-        in_path,
-        out_path,
-    ) {
+pub async fn serve(blog: &mut Processor<Blog>) -> anyhow::Result<()> {
+    if let Err(e) = blog.run_with(CompileOptions {
+        dev: true,
+        clean: false,
+    }) {
         error!("{e:?}");
     }
 
@@ -24,9 +16,9 @@ pub async fn serve(
     .context("failed to intialise filesystem watcher")?;
 
     watcher
-        .watch(in_path, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", in_path.display()))?;
-    info!("watching {}", in_path.display());
+        .watch(&blog.in_path, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", blog.in_path.display()))?;
+    info!("watching {}", blog.in_path.display());
 
     let server = warp::serve(warp::path(PREFIX.trim_prefix('/')).and(warp::fs::dir("dist")));
     tokio::select! {
@@ -42,11 +34,11 @@ pub async fn serve(
                     if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..) | EventKind::Remove(..)) {
                         continue;
                     }
-                    if event.paths.iter().any(|p| p.starts_with(out_path)) {
+                    if event.paths.iter().any(|p| p.starts_with(&blog.out_path)) {
                         continue;
                     }
 
-                    if let Err(e) = blog.run_with(CompileOptions { dev: true, clean: false }, in_path, out_path) {
+                    if let Err(e) = blog.run_with(CompileOptions { dev: true, clean: false }) {
                         error!("{e:?}");
                     }
                 }
@@ -61,7 +53,7 @@ pub async fn serve(
     Ok(())
 }
 
-use std::{net::SocketAddrV4, path::Path};
+use std::net::SocketAddrV4;
 
 use anyhow::Context as _;
 use blog_compiler::processor::Processor;
