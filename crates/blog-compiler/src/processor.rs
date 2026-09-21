@@ -1,3 +1,4 @@
+#[derive(PartialEq, Debug, Clone)]
 pub struct Processor<P: Process> {
     pub process: P,
     last_output: Option<P::Output>,
@@ -5,8 +6,8 @@ pub struct Processor<P: Process> {
 }
 
 pub trait Process {
-    type Output = ();
-    type Input: PartialEq = ();
+    type Output: Debug = ();
+    type Input: PartialEq + Debug = ();
 
     fn execute(
         &mut self,
@@ -28,14 +29,17 @@ impl<P: Process> Processor<P> {
     pub fn run_with(
         &mut self,
         input: P::Input,
-        in_path: &Path,
-        out_path: &Path,
+        in_path: impl AsRef<Path>,
+        out_path: impl AsRef<Path>,
     ) -> Result<&P::Output> {
-        let current_hash = hash_directory(in_path)
+        let in_path = in_path.as_ref();
+        let out_path = out_path.as_ref();
+        let current_hash = hash_directory(in_path, &[&out_path])
             .with_context(|| format!("failed to hash '{}'", in_path.display()))?;
         let hash_path = out_path.join("hash.txt");
         let last_hash = get_last_hash(&hash_path)
             .with_context(|| format!("failed to get last hash of '{}'", out_path.display()))?;
+
         if last_hash.is_some_and(|h| h == current_hash)
             && let Some(last_output) = self.last_output.as_ref()
             && let Some(last_input) = self.last_input.as_ref()
@@ -43,6 +47,7 @@ impl<P: Process> Processor<P> {
         {
             return Ok(last_output);
         }
+
         fs::create_dir_all(&out_path)
             .with_context(|| format!("failed to create '{}'", out_path.display()))?;
 
@@ -58,17 +63,40 @@ impl<P: Process> Processor<P> {
 }
 
 impl<P: Process<Input = ()>> Processor<P> {
-    pub fn run(&mut self, in_path: &Path, out_path: &Path) -> Result<&P::Output> {
+    pub fn run(
+        &mut self,
+        in_path: impl AsRef<Path>,
+        out_path: impl AsRef<Path>,
+    ) -> Result<&P::Output> {
         self.run_with((), in_path, out_path)
     }
 }
 
-fn hash_directory(dir: &Path) -> Result<String> {
+impl<P: Process> DerefMut for Processor<P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.process
+    }
+}
+
+impl<P: Process> Deref for Processor<P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        &self.process
+    }
+}
+
+fn hash_directory(dir: &Path, exclude: &[&Path]) -> Result<String> {
     let mut hasher = Sha256::new();
     let mut buf = Vec::with_capacity(1024);
 
-    for entry in WalkDir::new(dir).sort_by_file_name() {
+    'outer: for entry in WalkDir::new(dir).sort_by_file_name() {
         let entry = entry.context("error when walking post directory")?;
+        for exclude in exclude {
+            if entry.path().starts_with(exclude) {
+                continue 'outer;
+            }
+        }
         hasher.update(entry.path().as_os_str().as_encoded_bytes());
         if entry.file_type().is_file() {
             buf.clear();
@@ -122,8 +150,10 @@ impl Process for CopyDir {
 use anyhow::{Context as _, Result};
 use openssl::sha::Sha256;
 use std::{
+    fmt::Debug,
     fs::{self, File},
     io::{ErrorKind, Read as _},
+    ops::{Deref, DerefMut},
     path::Path,
 };
 use walkdir::WalkDir;

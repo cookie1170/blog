@@ -1,56 +1,33 @@
 #![feature(associated_type_defaults)]
 
 mod parser;
-mod processor;
+pub mod processor;
 mod renderer;
 mod typst;
 
 pub const PREFIX: &str = "/blog";
 
 pub struct Blog {
-    pub dist_dir: PathBuf,
-    pub posts_dir: PathBuf,
-    pub public_dir: PathBuf,
-    pub dist_public_dir: PathBuf,
-    pub dev_public_dir: PathBuf,
-    pub dist_dev_public_dir: PathBuf,
-    pub root_dir: PathBuf,
     copy_public_dir: Processor<CopyDir>,
     copy_dev_public_dir: Processor<CopyDir>,
     posts: Vec<Processor<Post>>,
 }
 
 impl Blog {
-    pub fn new(root_dir: PathBuf) -> anyhow::Result<Self> {
-        let root_dir = root_dir
-            .canonicalize()
-            .with_context(|| format!("failed to canonicalize '{}'", root_dir.display()))?;
-        let posts_dir = root_dir.join("posts");
-        let dist_dir = root_dir.join("dist");
-        let public_dir = root_dir.join("public");
-        let dist_public_dir = dist_dir.join("public");
-        let dev_public_dir = root_dir.join("dev_public");
-        let dist_dev_public_dir = dist_dir.join("dev_public");
-        let mut blog = Self {
-            root_dir,
-            posts_dir,
-            dist_dir,
-            public_dir,
-            dist_public_dir,
-            dev_public_dir,
-            dist_dev_public_dir,
+    pub fn new() -> Self {
+        Self {
             copy_public_dir: Processor::new(CopyDir),
             copy_dev_public_dir: Processor::new(CopyDir),
             posts: Vec::new(),
-        };
-        blog.update_posts()?;
-        Ok(blog)
+        }
     }
 
-    pub fn update_posts(&mut self) -> anyhow::Result<()> {
-        self.posts.clear();
-        for post in fs::read_dir(&self.posts_dir)
-            .with_context(|| format!("failed to read {}", self.posts_dir.display()))?
+    pub fn update_posts(&mut self, posts_dir: &Path) -> anyhow::Result<()> {
+        self.posts
+            .retain(|p| fs::exists(posts_dir.join(&p.slug)).is_ok_and(|b| b));
+
+        for post in fs::read_dir(posts_dir)
+            .with_context(|| format!("failed to read {}", posts_dir.display()))?
         {
             let post = post.context("failed to read post")?;
             if !post
@@ -65,53 +42,84 @@ impl Blog {
                 .file_name()
                 .map(OsStr::to_string_lossy)
                 .context("failed to get post file name")?;
-            let post = Processor::new(Post::new(slug.into_owned()));
-            self.posts.push(post);
-        }
-
-        Ok(())
-    }
-
-    pub fn recompile(&mut self, opts: CompileOptions) -> anyhow::Result<()> {
-        if opts.clean {
-            let _ = fs::remove_dir_all(&self.dist_dir);
-        }
-
-        self.copy_public_dir
-            .run(&self.public_dir, &self.dist_public_dir)?;
-
-        if opts.dev {
-            self.copy_dev_public_dir
-                .run(&self.dev_public_dir, &self.dist_dev_public_dir)?;
-        }
-
-        for post in &mut self.posts {
-            let output_path = self.dist_dir.join(&post.process.slug);
-            let input_path = self.posts_dir.join(&post.process.slug);
-            post.run_with(opts.dev, &input_path, &output_path)
-                .with_context(|| format!("failed to compile post at {}", input_path.display()))?;
+            if !self.posts.iter().any(|p| p.slug == slug) {
+                let post = Processor::new(Post::new(slug.into_owned()));
+                self.posts.push(post);
+            }
         }
 
         Ok(())
     }
 }
 
+impl Process for Blog {
+    type Input = CompileOptions;
+
+    fn execute(
+        &mut self,
+        opts: &CompileOptions,
+        in_path: &Path,
+        out_path: &Path,
+    ) -> anyhow::Result<()> {
+        if opts.clean {
+            let _ = fs::remove_dir_all(out_path);
+        }
+
+        let posts_path = in_path.join("posts");
+        self.update_posts(&posts_path)?;
+
+        self.copy_public_dir
+            .run(in_path.join("public"), out_path.join("public"))?;
+
+        if opts.dev {
+            self.copy_dev_public_dir
+                .run(in_path.join("dev_public"), out_path.join("dev_public"))?;
+        }
+
+        let mut post_metas = Vec::with_capacity(self.posts.len());
+
+        for post in &mut self.posts {
+            let in_path = posts_path.join(&post.slug);
+            let out_path = out_path.join(&post.slug);
+            let meta = post
+                .run_with(opts.dev, &in_path, &out_path)
+                .with_context(|| format!("failed to compile post at {}", in_path.display()))?;
+            post_metas.push(meta)
+        }
+
+        let posts_json_path = out_path.join("posts.json");
+        let posts_json = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&posts_json_path)
+            .with_context(|| format!("failed to open {}", posts_json_path.display()))?;
+
+        serde_json::to_writer(posts_json, &post_metas)
+            .with_context(|| format!("failed to write to {}", posts_json_path.display()))?;
+
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct CompileOptions {
     pub dev: bool,
     pub clean: bool,
+}
+
+#[derive(Serialize, PartialEq, Debug, Clone)]
+pub struct PostMeta {
+    pub title: String,
+    pub slug: String,
+    pub date: Date,
+    pub tags: Vec<String>,
 }
 
 pub struct Post {
     slug: String,
     renderer: Renderer,
     copy_images: Processor<CopyDir>,
-}
-
-#[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct PostMeta {
-    title: String,
-    date: Date,
-    tags: Vec<String>,
 }
 
 impl Post {
@@ -149,25 +157,30 @@ impl Process for Post {
 
         let meta = self
             .renderer
-            .render(&markdown, &self.slug, out_html, *dev)
+            .render(&markdown, out_html, *dev)
             .context("failed to render html")?;
 
         let images_path = in_path.join("images");
         let dist_images_path = out_path.join("images");
         self.copy_images.run(&images_path, &dist_images_path)?;
 
-        Ok(meta)
+        Ok(PostMeta {
+            title: meta.title,
+            slug: self.slug.clone(),
+            date: meta.date,
+            tags: meta.tags,
+        })
     }
 }
 
 use anyhow::{Context, Result};
 use jiff::civil::Date;
-use serde::Deserialize;
+use serde::Serialize;
 use std::{
     ffi::OsStr,
     fs::{self, OpenOptions},
     io::BufWriter,
-    path::{Path, PathBuf},
+    path::Path,
 };
 use tracing::*;
 

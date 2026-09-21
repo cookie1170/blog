@@ -9,16 +9,15 @@ impl Renderer {
     }
 }
 
-struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
+struct RendererInner<'i, 'm, 'r, O: io::Write> {
     events: IntoIter<Event<'i>>,
-    post_meta: &'m PostMeta,
+    post_meta: &'m PostRootMeta,
     output: IoWriter<BufWriter<O>>,
     outer: &'r mut Renderer,
-    slug: &'s str,
     dev: bool,
 }
 
-impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
+impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
         self.write_fmt(format_args!(
             r#"
@@ -278,7 +277,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 title,
                 id: _,
             } => {
-                self.write_fmt(format_args!("<img src=\"{}/", &*self.slug))?;
+                self.write("<img src=\"")?;
                 self.write_escaped_href(&dest_url)?;
                 self.write("\" alt=\"")?;
                 self.raw_text()?;
@@ -401,19 +400,18 @@ impl Renderer {
     pub fn render<O: io::Write>(
         &mut self,
         source: &str,
-        slug: &str,
         output: BufWriter<O>,
         dev: bool,
-    ) -> Result<PostMeta> {
+    ) -> Result<PostRootMeta> {
         let ParseResult { root_meta, events } = parser::parse(source)?;
         let events = events.into_iter();
-        let post_meta: PostMeta = toml::from_str(&root_meta).context("invalid root metadata")?;
+        let post_meta: PostRootMeta =
+            toml::from_str(&root_meta).context("invalid root metadata")?;
         let mut renderer = RendererInner {
             events,
             post_meta: &post_meta,
             output: IoWriter(output),
             outer: self,
-            slug,
             dev,
         };
 
@@ -427,8 +425,8 @@ impl Renderer {
 }
 
 use crate::{
-    PREFIX, PostMeta,
-    parser::{self, Event, ParseResult, Tag, TagEnd},
+    PREFIX,
+    parser::{self, Event, ParseResult, PostRootMeta, Tag, TagEnd},
 };
 use anyhow::{Context, Result};
 use pulldown_cmark::{Alignment, BlockQuoteKind, CodeBlockKind, LinkType};

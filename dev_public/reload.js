@@ -1,11 +1,9 @@
 let lastHash;
 
-let reloadId = setInterval(reloadIfNeeded, 50);
+let reloadId = setInterval(reloadIfNeeded, 100);
 
 async function fetchHash() {
-  let splitUrl = document.URL.split("/");
-  let hashUrl = splitUrl[splitUrl.length - 1] + "/hash.txt";
-  let hash = await (await fetch(hashUrl)).text();
+  let hash = await (await fetch("hash.txt")).text();
   return hash;
 }
 

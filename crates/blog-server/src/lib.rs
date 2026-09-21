@@ -1,11 +1,19 @@
 #![feature(trim_prefix_suffix)]
 
 #[tokio::main]
-pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
-    if let Err(e) = blog.recompile(CompileOptions {
-        dev: true,
-        clean: false,
-    }) {
+pub async fn serve(
+    blog: &mut Processor<Blog>,
+    in_path: &Path,
+    out_path: &Path,
+) -> anyhow::Result<()> {
+    if let Err(e) = blog.run_with(
+        CompileOptions {
+            dev: true,
+            clean: false,
+        },
+        in_path,
+        out_path,
+    ) {
         error!("{e:?}");
     }
 
@@ -16,9 +24,9 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
     .context("failed to intialise filesystem watcher")?;
 
     watcher
-        .watch(&blog.root_dir, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch '{}'", blog.root_dir.display()))?;
-    info!("watching {}", blog.root_dir.display());
+        .watch(in_path, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch '{}'", in_path.display()))?;
+    info!("watching {}", in_path.display());
 
     let server = warp::serve(warp::path(PREFIX.trim_prefix('/')).and(warp::fs::dir("dist")));
     tokio::select! {
@@ -34,10 +42,11 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
                     if !matches!(event.kind, EventKind::Modify(..) | EventKind::Create(..) | EventKind::Remove(..)) {
                         continue;
                     }
-                    if event.paths.iter().any(|p| p.starts_with(&blog.dist_dir)) {
+                    if event.paths.iter().any(|p| p.starts_with(out_path)) {
                         continue;
                     }
-                    if let Err(e) = blog.recompile(CompileOptions { dev: true, clean: false }) {
+
+                    if let Err(e) = blog.run_with(CompileOptions { dev: true, clean: false }, in_path, out_path) {
                         error!("{e:?}");
                     }
                 }
@@ -52,9 +61,10 @@ pub async fn serve(blog: &mut Blog) -> anyhow::Result<()> {
     Ok(())
 }
 
-use std::net::SocketAddrV4;
+use std::{net::SocketAddrV4, path::Path};
 
 use anyhow::Context as _;
+use blog_compiler::processor::Processor;
 use blog_compiler::{Blog, CompileOptions, PREFIX};
 use notify::{EventKind, RecursiveMode, Watcher};
 use tracing::{error, info};

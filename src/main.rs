@@ -3,22 +3,34 @@
 fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
 
-    let mut blog = Blog::new(std::env::current_dir().context("failed to get cwd")?)?;
+    let mut blog = Processor::new(Blog::new());
+    let in_path = std::env::current_dir().context("failed to get cwd")?;
+    let out_path = in_path.join("dist");
     match std::env::args().nth(1) {
         Some(deref!("serve")) => {
             cfg_select! {
-                feature = "serve" => blog_server::serve(&mut blog),
+                feature = "serve" => {
+                    blog_server::serve(&mut blog, &in_path, &out_path)?;
+                }
                 _ => bail!("`serve` cargo feature must be enabled to use `serve`!"),
             }
         }
-        Some(deref!("compile")) => blog.recompile(CompileOptions {
-            dev: false,
-            clean: true,
-        }),
+        Some(deref!("compile")) => {
+            blog.run_with(
+                CompileOptions {
+                    dev: false,
+                    clean: true,
+                },
+                &in_path,
+                &out_path,
+            )?;
+        }
         Some(other) => bail!("unknown action: '{other}'"),
         None => bail!("expected action argument"),
     }
+
+    Ok(())
 }
 
 use anyhow::{Context, bail};
-use blog_compiler::{Blog, CompileOptions};
+use blog_compiler::{Blog, CompileOptions, processor::Processor};

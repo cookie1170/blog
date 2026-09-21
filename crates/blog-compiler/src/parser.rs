@@ -21,6 +21,13 @@ struct Parser<'i> {
     ignore: bool,
 }
 
+#[derive(Deserialize, PartialEq, Debug, Clone)]
+pub struct PostRootMeta {
+    pub title: String,
+    pub date: Date,
+    pub tags: Vec<String>,
+}
+
 pub fn parse<'i>(source: &'i str) -> Result<ParseResult<'i>> {
     let options = Options::ENABLE_GFM
         | Options::ENABLE_MATH
@@ -552,7 +559,9 @@ pub enum TagEnd {
 use std::collections::HashMap;
 
 use anyhow::{Context as _, Result, bail};
+use jiff::civil::Date;
 use pulldown_cmark::{
     Alignment, BlockQuoteKind, CodeBlockKind, CowStr, Event as CE, HeadingLevel, LinkType,
     MetadataBlockKind, Options, Parser as CmarkParser, Tag as CTag, TagEnd as CTagEnd,
 };
+use serde::Deserialize;
