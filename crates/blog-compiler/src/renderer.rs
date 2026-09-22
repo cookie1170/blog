@@ -448,9 +448,9 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
                 <article class="post-embed">
                     <a class="block-link" href="/blog/{slug}">
                         <h1 class="title on-container">{title}</h1>
-                        <div class="tags">{tags}</div>
-                        <p class="date">{date}</p>
                     </a>
+                    <div class="tags">{tags}</div>
+                    <p class="date">{date}</p>
                 </article>
         "#,
             slug = post.slug,
@@ -461,7 +461,7 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
 
     write!(
         &mut writer,
-        r#"
+        r##"
 <!doctype html>
 
 <html lang="en-US">
@@ -472,29 +472,57 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
         <title>Cookie's blog</title>
         {dev_script}
         <script type="module">
-            let posts = await (await fetch("{PREFIX}/posts.json")).json();
+        document.querySelector("#search-container").innerHTML = `
+            <div class="search-bar">
+                <input id="search" type="text" />
+            </div>
+        `;
+        let posts = await (await fetch("/blog/posts.json")).json();
+        document.querySelector("#search").addEventListener("input", search);
+        search();
 
-            function rebuildPosts(posts) {{
-                let postsContainer = document.querySelector(".posts-container");
-                postsContainer.innerHTML = "";
-                for (let post of posts) {{
-                    let tagsString = "";
-                    for (let tag of post.tags) {{
-                        tagsString += `<span class="tag">${{tag}}</span>`;
-                    }}
-
-                    postsContainer.innerHTML += `
-                        <article class="post-embed">
-                            <a class="block-link" href="/blog/${{post.slug}}">
-                                <h1 class="title on-container">${{post.title}}</h1>
-                                <div class="tags">${{tagsString}}</div>
-                                <p class="date">${{post.formatted_date}}</p>
-                            </a>
-                        </article>
-                    `;
+        function rebuildPosts(posts) {{
+            let postsContainer = document.querySelector(".posts-container");
+            postsContainer.innerHTML = "";
+            for (let post of posts) {{
+                let tagsString = "";
+                for (let tag of post.tags) {{
+                    tagsString += `<span class="tag">${{tag}}</span>`;
                 }}
+
+                postsContainer.innerHTML += `
+                    <article class="post-embed">
+                        <a class="block-link" href="/blog/${{post.slug}}">
+                            <h1 class="title on-container">${{post.title}}</h1>
+                        </a>
+                        <div class="tags">${{tagsString}}</div>
+                        <p class="date">${{post.formatted_date}}</p>
+                    </article>
+                `;
             }}
-        </script>
+        }}
+
+        function search() {{
+            let searchBar = document.querySelector("#search");
+            let query = searchBar.value.toLowerCase();
+            if (query == "") {{
+                rebuildPosts(posts);
+                return;
+            }}
+
+            let splitQuery = query.split(" ");
+            let matchingPosts = posts.filter((post) => {{
+                return splitQuery.find(
+                    (word) =>
+                        post.title.toLowerCase().includes(word) ||
+                        post.tags.find((tag) =>
+                            tag.toLowerCase().includes(word),
+                        ),
+                );
+            }});
+            rebuildPosts(matchingPosts);
+        }}
+       </script>
     </head>
     <body>
         <div class="post">
@@ -515,13 +543,14 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
                 </p>
             </div>
             <hr class="section-split" />
+            <div id="search-container"></div>
             <div class="posts-container">
                 {posts}
             </div>
         </div>
     </body>
 </html>
-"#,
+"##,
         dev_script = if dev {
             format!(r#"<script src="{PREFIX}/dev_public/reload.js"></script>"#)
         } else {

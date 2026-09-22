@@ -13,6 +13,7 @@
 
 :root {
     font-family: "PT Sans", sans-serif;
+    accent-color: var(--accent);
     clear: left;
 }
 
@@ -41,6 +42,21 @@ body {
 
 .section-split {
     margin: 1rem 0;
+}
+
+.search-bar input {
+    background-color: var(--container);
+    border: var(--container-2) solid 1px;
+    color: var(--on-container);
+    padding: 0.5rem;
+    border-radius: 500px;
+    height: 2rem;
+    box-sizing: border-box;
+}
+
+.search-bar input:hover,
+.search-bar input:focus {
+    background-color: var(--container-2);
 }
 
 /* post */
