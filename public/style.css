@@ -28,6 +28,21 @@ body {
     padding: 0;
 }
 
+/* index */
+
+.post-embed {
+    background-color: var(--container);
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    padding-top: 0;
+    border-radius: 0.25rem;
+    border: var(--container-2) solid 1px;
+}
+
+.section-split {
+    margin: 1rem 0;
+}
+
 /* post */
 
 hr {
@@ -176,13 +191,22 @@ p {
     max-width: 100%;
 }
 
-a {
+.a {
     color: var(--accent);
     text-decoration: none;
     font-weight: bold;
 }
 
-a:hover {
+.a:hover {
+    text-decoration: underline;
+}
+
+.block-link {
+    text-decoration: none;
+}
+
+.block-link:hover {
+    color: var(--accent);
     text-decoration: underline;
 }
 
@@ -193,6 +217,10 @@ a:hover {
     margin: 0.125rem;
     margin-right: 0.25rem;
     border-radius: 0.25rem;
+}
+
+.on-container {
+    color: var(--on-container);
 }
 
 /* HACK: typst's svg output hardcodes colours as `fill="000000"`, etc */

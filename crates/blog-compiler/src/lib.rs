@@ -89,9 +89,28 @@ impl Process for Blog {
             let post_path = self.posts_path.join(&post.slug);
             let meta = post
                 .run_with(opts.dev)
-                .with_context(|| format!("failed to compile post at {}", post_path.display()))?;
+                .with_context(|| format!("failed to compile post at '{}'", post_path.display()))?;
             post_metas.push(meta)
         }
+        post_metas.sort_by(|a, b| {
+            if a.date == b.date {
+                a.cmp(b)
+            } else {
+                // reverse the ordering so that later posts go before earlier posts
+                a.date.cmp(&b.date).reverse()
+            }
+        });
+
+        let index_path = self.out_path.join("index.html");
+        let index = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&index_path)
+            .with_context(|| format!("failed to open '{}'", index_path.display()))?;
+
+        renderer::write_index(index, &post_metas, opts.dev)
+            .with_context(|| format!("failed to write index page to '{}'", index_path.display()))?;
 
         let posts_json_path = self.out_path.join("posts.json");
         let posts_json = OpenOptions::new()
@@ -99,10 +118,10 @@ impl Process for Blog {
             .create(true)
             .truncate(true)
             .open(&posts_json_path)
-            .with_context(|| format!("failed to open {}", posts_json_path.display()))?;
+            .with_context(|| format!("failed to open '{}'", posts_json_path.display()))?;
 
         serde_json::to_writer(posts_json, &post_metas)
-            .with_context(|| format!("failed to write to {}", posts_json_path.display()))?;
+            .with_context(|| format!("failed to write to '{}'", posts_json_path.display()))?;
 
         Ok(())
     }
@@ -116,12 +135,34 @@ pub struct CompileOptions {
     pub clean: bool,
 }
 
-#[derive(Serialize, PartialEq, Debug, Clone)]
+#[derive(Serialize, PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
+#[serde(into = "SerializedPostMeta")]
 pub struct PostMeta {
     pub title: String,
     pub slug: String,
     pub date: Date,
     pub tags: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct SerializedPostMeta {
+    pub title: String,
+    pub slug: String,
+    pub date: Date,
+    pub formatted_date: String,
+    pub tags: Vec<String>,
+}
+
+impl From<PostMeta> for SerializedPostMeta {
+    fn from(value: PostMeta) -> Self {
+        SerializedPostMeta {
+            title: value.title,
+            slug: value.slug,
+            date: value.date,
+            formatted_date: value.date.strftime(DATE_FORMAT).to_string(),
+            tags: value.tags,
+        }
+    }
 }
 
 pub struct Post {
@@ -174,7 +215,7 @@ impl Process for Post {
 
         let meta = self
             .renderer
-            .render(&markdown, out_html, *dev)
+            .render(&markdown, &self.slug, out_html, *dev)
             .context("failed to render html")?;
 
         self.copy_images.run()?;
@@ -203,5 +244,5 @@ use tracing::*;
 
 use crate::{
     processor::{CopyDir, Process, Processor},
-    renderer::Renderer,
+    renderer::{DATE_FORMAT, Renderer},
 };

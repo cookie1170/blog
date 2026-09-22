@@ -1,6 +1,6 @@
 let lastHash;
 
-let reloadId = setInterval(reloadIfNeeded, 100);
+let reloadId = setInterval(reloadIfNeeded, 75);
 
 async function fetchHash() {
   let hash = await (await fetch("hash.txt")).text();

@@ -1,3 +1,5 @@
+pub const DATE_FORMAT: &str = "%d %B %Y";
+
 pub struct Renderer {
     typst: TypstCompiler,
 }
@@ -9,15 +11,16 @@ impl Renderer {
     }
 }
 
-struct RendererInner<'i, 'm, 'r, O: io::Write> {
+struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
     events: IntoIter<Event<'i>>,
     post_meta: &'m PostRootMeta,
     output: IoWriter<BufWriter<O>>,
     outer: &'r mut Renderer,
+    slug: &'s str,
     dev: bool,
 }
 
-impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
+impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
         self.write_fmt(format_args!(
             r#"
@@ -28,6 +31,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
         <meta name="viewport" content="width=device-width" />
         <link href="{PREFIX}/public/style.css" rel="stylesheet" />
         <title>{title} -- Cookie's blog</title>
+        <base href="/blog/{slug}/index.html">
         {dev_script}
     </head>
     <body>
@@ -37,10 +41,12 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 <div class="tags">{tags}</div>
                 <p class="date">{date}</h1>
             </div>
+            <hr class="section-split" />
             <div class="body">
         "#,
             title = self.post_meta.title,
-            date = self.post_meta.date.strftime("%d %B %Y"),
+            date = self.post_meta.date.strftime(DATE_FORMAT),
+            slug = { self.slug },
             tags = self.format_tags()?,
             dev_script = if self.dev {
                 format!(r#"<script src="{}/dev_public/reload.js"></script>"#, PREFIX)
@@ -246,7 +252,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
-                self.write("<a href=\"mailto:")?;
+                self.write(r#"<a class="a" href="mailto:"#)?;
                 self.write_escaped_href(&dest_url)?;
                 if !title.is_empty() {
                     self.write("\" title=\"")?;
@@ -260,9 +266,11 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
-                self.write("<a href=\"")?;
+                self.write(r#"<a class="a" href=""#)?;
                 if dest_url.starts_with('/') {
                     self.write(PREFIX)?;
+                } else if !dest_url.contains("://") {
+                    self.write_fmt(format_args!("{PREFIX}/{}", { self.slug }))?;
                 }
                 self.write_escaped_href(&dest_url)?;
                 if !title.is_empty() {
@@ -277,7 +285,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
-                self.write("<img src=\"")?;
+                self.write_fmt(format_args!(r#"<img src="{PREFIX}/{}/"#, { self.slug }))?;
                 self.write_escaped_href(&dest_url)?;
                 self.write("\" alt=\"")?;
                 self.raw_text()?;
@@ -400,6 +408,7 @@ impl Renderer {
     pub fn render<O: io::Write>(
         &mut self,
         source: &str,
+        slug: &str,
         output: BufWriter<O>,
         dev: bool,
     ) -> Result<PostRootMeta> {
@@ -412,6 +421,7 @@ impl Renderer {
             post_meta: &post_meta,
             output: IoWriter(output),
             outer: self,
+            slug,
             dev,
         };
 
@@ -424,8 +434,106 @@ impl Renderer {
     }
 }
 
+pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Result<()> {
+    let mut posts = String::with_capacity(512 * metas.len());
+    for post in metas {
+        let mut tags = String::with_capacity(40 * post.tags.len());
+        for tag in &post.tags {
+            write!(&mut tags, r#"<span class="tag">{tag}</span>"#)?;
+        }
+
+        write!(
+            &mut posts,
+            r#"
+                <article class="post-embed">
+                    <a class="block-link" href="/blog/{slug}">
+                        <h1 class="title on-container">{title}</h1>
+                        <div class="tags">{tags}</div>
+                        <p class="date">{date}</p>
+                    </a>
+                </article>
+        "#,
+            slug = post.slug,
+            title = post.title,
+            date = post.date.strftime(DATE_FORMAT)
+        )?;
+    }
+
+    write!(
+        &mut writer,
+        r#"
+<!doctype html>
+
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+        <link href="{PREFIX}/public/style.css" rel="stylesheet" />
+        <title>Cookie's blog</title>
+        {dev_script}
+        <script type="module">
+            let posts = await (await fetch("{PREFIX}/posts.json")).json();
+
+            function rebuildPosts(posts) {{
+                let postsContainer = document.querySelector(".posts-container");
+                postsContainer.innerHTML = "";
+                for (let post of posts) {{
+                    let tagsString = "";
+                    for (let tag of post.tags) {{
+                        tagsString += `<span class="tag">${{tag}}</span>`;
+                    }}
+
+                    postsContainer.innerHTML += `
+                        <article class="post-embed">
+                            <a class="block-link" href="/blog/${{post.slug}}">
+                                <h1 class="title on-container">${{post.title}}</h1>
+                                <div class="tags">${{tagsString}}</div>
+                                <p class="date">${{post.formatted_date}}</p>
+                            </a>
+                        </article>
+                    `;
+                }}
+            }}
+        </script>
+    </head>
+    <body>
+        <div class="post">
+            <div class="head">
+                <h1 class="title">Cookie's Blog</h1>
+                <div class="tags">
+                    <span class="tag">Gamedev</span>
+                    <span class="tag">Programming</span>
+                    <span class="tag">Tutorials</span>
+                    <span class="tag">Devlogs</span>
+                </div>
+                <p>Hi, I'm Cookie and this is my blog!</p>
+                <p>
+                    I mainly post educational content about programming,
+                    graphics programming, and gamedev related topics, and
+                    occasional devlogs or random side-tangents. Hope you enjoy
+                    it!
+                </p>
+            </div>
+            <hr class="section-split" />
+            <div class="posts-container">
+                {posts}
+            </div>
+        </div>
+    </body>
+</html>
+"#,
+        dev_script = if dev {
+            format!(r#"<script src="{PREFIX}/dev_public/reload.js"></script>"#)
+        } else {
+            String::new()
+        }
+    )?;
+
+    Ok(())
+}
+
 use crate::{
-    PREFIX,
+    PREFIX, PostMeta,
     parser::{self, Event, ParseResult, PostRootMeta, Tag, TagEnd},
 };
 use anyhow::{Context, Result};
