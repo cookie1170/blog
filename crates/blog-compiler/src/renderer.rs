@@ -536,7 +536,7 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
                 </div>
                 <p>Hi, I'm Cookie and this is my blog!</p>
                 <p>
-                    I mainly post educational content about programming,
+                    I mainly write educational content about programming,
                     graphics programming, and gamedev related topics, and
                     occasional devlogs or random side-tangents. Hope you enjoy
                     it!
