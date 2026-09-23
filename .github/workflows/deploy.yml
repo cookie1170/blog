@@ -1,3 +1,4 @@
+name: deploy
 run-name: Deploy site
 
 on:
