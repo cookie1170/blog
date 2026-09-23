@@ -14,31 +14,36 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TARGET: "x86_64-unknown-linux-gnu"
     steps:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: cargo build --release --target "$TARGET"
+      - run: mv "target/$TARGET/release/blog" "blog-$TARGET"
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          path: "target/x86_64-unknown-linux-gnu/release/blog"
-          name: blog-x86_64-unknown-linux-gnu
+          path: blog-${{ env.TARGET }}
+          name: blog-${{ env.TARGET }}
 
   upload:
     runs-on: ubuntu-latest
     needs: build
+    env:
+      TARGET: "x86_64-unknown-linux-gnu"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
         id: download
         with:
-          name: blog-x86_64-unknown-linux-gnu
+          name: blog-${{ env.TARGET }}
       - run: ls '${{ steps.download.outputs.download-path }}'
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload '${{ github.ref_name }}' '${{ steps.download.outputs.download-path }}/blog-x86_64-unknown-linux-gnu'
+        run: gh release upload '${{ github.ref_name }}' '${{ steps.download.outputs.download-path }}/blog-$TARGET'
 
   deploy:
     needs: upload
