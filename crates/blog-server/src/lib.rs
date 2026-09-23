@@ -1,5 +1,3 @@
-#![feature(trim_prefix_suffix)]
-
 #[tokio::main]
 pub async fn serve(blog: &mut Processor<Blog>) -> anyhow::Result<()> {
     if let Err(e) = blog.run_with(CompileOptions {

@@ -1,0 +1,47 @@
+run-name: Deploy site
+
+on:
+  push:
+    branches: [$default-branch]
+
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install generator
+        uses: jaxxstorm/action-install-gh-release@v1.10.0
+        with:
+          repo: cookie1170/blog
+          extension-matching: disable
+          rename-to: blog-generator
+          chmod: 0755
+      - name: Build static site
+        run: blog-generator compile
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

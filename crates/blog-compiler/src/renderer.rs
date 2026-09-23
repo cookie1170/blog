@@ -31,7 +31,6 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         <meta name="viewport" content="width=device-width" />
         <link href="{PREFIX}/public/style.css" rel="stylesheet" />
         <title>{title} -- Cookie's blog</title>
-        <base href="/blog/{slug}/index.html">
         {dev_script}
     </head>
     <body>
@@ -46,7 +45,6 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         "#,
             title = self.post_meta.title,
             date = self.post_meta.date.strftime(DATE_FORMAT),
-            slug = { self.slug },
             tags = self.format_tags()?,
             dev_script = if self.dev {
                 format!(r#"<script src="{}/dev_public/reload.js"></script>"#, PREFIX)
@@ -472,57 +470,57 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
         <title>Cookie's blog</title>
         {dev_script}
         <script type="module">
-        document.querySelector("#search-container").innerHTML = `
-            <div class="search-bar">
-                <input id="search" type="text" />
-            </div>
-        `;
-        let posts = await (await fetch("/blog/posts.json")).json();
-        document.querySelector("#search").addEventListener("input", search);
-        search();
+            document.querySelector("#search-container").innerHTML = `
+                <div class="search-bar">
+                    <input id="search" type="text" />
+                </div>
+            `;
+            let posts = await (await fetch("/blog/posts.json")).json();
+            document.querySelector("#search").addEventListener("input", search);
+            search();
 
-        function rebuildPosts(posts) {{
-            let postsContainer = document.querySelector(".posts-container");
-            postsContainer.innerHTML = "";
-            for (let post of posts) {{
-                let tagsString = "";
-                for (let tag of post.tags) {{
-                    tagsString += `<span class="tag">${{tag}}</span>`;
+            function rebuildPosts(posts) {{
+                let postsContainer = document.querySelector(".posts-container");
+                postsContainer.innerHTML = "";
+                for (let post of posts) {{
+                    let tagsString = "";
+                    for (let tag of post.tags) {{
+                        tagsString += `<span class="tag">${{tag}}</span>`;
+                    }}
+
+                    postsContainer.innerHTML += `
+                        <article class="post-embed">
+                            <a class="block-link" href="/blog/${{post.slug}}">
+                                <h1 class="title on-container">${{post.title}}</h1>
+                            </a>
+                            <div class="tags">${{tagsString}}</div>
+                            <p class="date">${{post.formatted_date}}</p>
+                        </article>
+                    `;
+                }}
+            }}
+
+            function search() {{
+                let searchBar = document.querySelector("#search");
+                let query = searchBar.value.toLowerCase();
+                if (query == "") {{
+                    rebuildPosts(posts);
+                    return;
                 }}
 
-                postsContainer.innerHTML += `
-                    <article class="post-embed">
-                        <a class="block-link" href="/blog/${{post.slug}}">
-                            <h1 class="title on-container">${{post.title}}</h1>
-                        </a>
-                        <div class="tags">${{tagsString}}</div>
-                        <p class="date">${{post.formatted_date}}</p>
-                    </article>
-                `;
+                let splitQuery = query.split(" ");
+                let matchingPosts = posts.filter((post) => {{
+                    return splitQuery.find(
+                        (word) =>
+                            post.title.toLowerCase().includes(word) ||
+                            post.tags.find((tag) =>
+                                tag.toLowerCase().includes(word),
+                            ),
+                    );
+                }});
+                rebuildPosts(matchingPosts);
             }}
-        }}
-
-        function search() {{
-            let searchBar = document.querySelector("#search");
-            let query = searchBar.value.toLowerCase();
-            if (query == "") {{
-                rebuildPosts(posts);
-                return;
-            }}
-
-            let splitQuery = query.split(" ");
-            let matchingPosts = posts.filter((post) => {{
-                return splitQuery.find(
-                    (word) =>
-                        post.title.toLowerCase().includes(word) ||
-                        post.tags.find((tag) =>
-                            tag.toLowerCase().includes(word),
-                        ),
-                );
-            }});
-            rebuildPosts(matchingPosts);
-        }}
-       </script>
+        </script>
     </head>
     <body>
         <div class="post">
