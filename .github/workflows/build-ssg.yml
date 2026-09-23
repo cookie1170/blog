@@ -3,6 +3,7 @@ run-name: Build static site generator
 
 on:
   release:
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
