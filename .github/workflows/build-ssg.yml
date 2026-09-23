@@ -39,7 +39,6 @@ jobs:
         id: download
         with:
           name: blog-${{ env.TARGET }}
-      - run: ls '${{ steps.download.outputs.download-path }}'
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
