@@ -43,7 +43,7 @@ jobs:
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload '${{ github.ref_name }}' '${{ steps.download.outputs.download-path }}/blog-$TARGET'
+        run: gh release upload '${{ github.ref_name }}' "${{ steps.download.outputs.download-path }}/blog-$TARGET"
 
   deploy:
     needs: upload
