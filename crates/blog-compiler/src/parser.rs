@@ -1,18 +1,18 @@
-pub struct ParseResult<'i> {
-    pub root_meta: CowStr<'i>,
-    pub events: Vec<Event<'i>>,
+pub struct ParseResult {
+    pub root_meta: String,
+    pub events: Vec<Event>,
 }
 
 #[derive(Debug)]
-struct Footnote<'i> {
+struct Footnote {
     number: usize,
-    events: Vec<Event<'i>>,
+    events: Vec<Event>,
 }
 
 struct Parser<'i> {
-    events: Vec<Event<'i>>,
-    footnotes: HashMap<CowStr<'i>, Footnote<'i>>,
-    current_footnote: Option<(CowStr<'i>, Footnote<'i>)>,
+    events: Vec<Event>,
+    footnotes: HashMap<CowStr<'i>, Footnote>,
+    current_footnote: Option<(CowStr<'i>, Footnote)>,
     current_alignments: Vec<Alignment>,
     current_metadata_block: String,
     current_cell_index: usize,
@@ -28,7 +28,7 @@ pub struct PostRootMeta {
     pub tags: Vec<String>,
 }
 
-pub fn parse<'i>(source: &'i str) -> Result<ParseResult<'i>> {
+pub fn parse(source: &str) -> Result<ParseResult> {
     let options = Options::ENABLE_GFM
         | Options::ENABLE_MATH
         | Options::ENABLE_TABLES
@@ -90,7 +90,7 @@ pub fn parse<'i>(source: &'i str) -> Result<ParseResult<'i>> {
     }
 
     Ok(ParseResult {
-        root_meta: meta,
+        root_meta: meta.into(),
         events: parser.events,
     })
 }
@@ -126,23 +126,23 @@ impl<'i> Parser<'i> {
         match event {
             CE::Start(tag) => self.start_tag(tag),
             CE::End(tag_end) => self.end_tag(tag_end),
-            CE::Text(cow_str) => {
+            CE::Text(text) => {
                 if self.in_metadata_block {
-                    self.current_metadata_block.push_str(&cow_str);
+                    self.current_metadata_block.push_str(&text);
                 } else {
-                    self.events().push(Event::Text(cow_str));
+                    self.events().push(Event::Text(text.into()));
                 }
             }
-            CE::Code(cow_str) => self.events().push(Event::Code(cow_str)),
-            CE::InlineMath(cow_str) => self.events().push(Event::InlineMath(cow_str)),
-            CE::DisplayMath(cow_str) => self.events().push(Event::DisplayMath(cow_str)),
-            CE::Html(cow_str) => self.events().push(Event::Html(cow_str)),
-            CE::InlineHtml(cow_str) => self.events().push(Event::InlineHtml(cow_str)),
-            CE::FootnoteReference(cow_str) => {
+            CE::Code(code) => self.events().push(Event::Code(code.into())),
+            CE::InlineMath(math) => self.events().push(Event::InlineMath(math.into())),
+            CE::DisplayMath(marh) => self.events().push(Event::DisplayMath(marh.into())),
+            CE::Html(html) => self.events().push(Event::Html(html.into())),
+            CE::InlineHtml(html) => self.events().push(Event::InlineHtml(html.into())),
+            CE::FootnoteReference(id) => {
                 let footnote = self
                     .footnotes
-                    .get(&cow_str)
-                    .with_context(|| format!("footnote {cow_str} not found"))?;
+                    .get(&id)
+                    .with_context(|| format!("footnote {id} not found"))?;
 
                 // HACK: due to the lack of view types, we have to copy & paste the `self.events()` method here
                 // so we can borrow both `self.footnotes` _and_ `self.events`,
@@ -153,7 +153,7 @@ impl<'i> Parser<'i> {
                 };
 
                 events.push(Event::Start(Tag::Footnote {
-                    name: cow_str,
+                    name: id.into(),
                     number: footnote.number,
                 }));
                 events.extend(footnote.events.iter().cloned());
@@ -182,12 +182,18 @@ impl<'i> Parser<'i> {
                 attrs,
             } => self.events().push(Event::Start(Tag::Heading {
                 level,
-                id,
-                classes,
-                attrs,
+                id: id.map(Into::into),
+                classes: classes.into_iter().map(Into::into).collect(),
+                attrs: attrs
+                    .into_iter()
+                    .map(|(k, v)| (k.into(), v.map(Into::into)))
+                    .collect(),
             })),
             CTag::BlockQuote(kind) => self.events().push(Event::Start(Tag::BlockQuote(kind))),
-            CTag::CodeBlock(kind) => self.events().push(Event::Start(Tag::CodeBlock(kind))),
+            CTag::CodeBlock(kind) => self.events().push(Event::Start(Tag::CodeBlock(match kind {
+                CCodeBlockKind::Indented => CodeBlockKind::Indented,
+                CCodeBlockKind::Fenced(lang) => CodeBlockKind::Fenced(lang.into()),
+            }))),
             CTag::HtmlBlock => self.events().push(Event::Start(Tag::HtmlBlock)),
             CTag::List(first) => self.events().push(Event::Start(Tag::List(first))),
             CTag::Item => self.events().push(Event::Start(Tag::Item)),
@@ -230,9 +236,9 @@ impl<'i> Parser<'i> {
                 id,
             } => self.events().push(Event::Start(Tag::Link {
                 link_type,
-                dest_url,
-                title,
-                id,
+                dest_url: dest_url.into(),
+                title: title.into(),
+                id: id.into(),
             })),
             CTag::Image {
                 link_type,
@@ -241,9 +247,9 @@ impl<'i> Parser<'i> {
                 id,
             } => self.events().push(Event::Start(Tag::Image {
                 link_type,
-                dest_url,
-                title,
-                id,
+                dest_url: dest_url.into(),
+                title: title.into(),
+                id: id.into(),
             })),
             CTag::MetadataBlock(MetadataBlockKind::PlusesStyle) => self.in_metadata_block = true,
 
@@ -312,7 +318,7 @@ impl<'i> Parser<'i> {
         }
     }
 
-    fn events(&mut self) -> &mut Vec<Event<'i>> {
+    fn events(&mut self) -> &mut Vec<Event> {
         match self.current_footnote {
             Some((_, ref mut f)) => &mut f.events,
             None => &mut self.events,
@@ -325,47 +331,47 @@ impl<'i> Parser<'i> {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Event<'a> {
+pub enum Event {
     /// Start of a tagged element. Events that are yielded after this event
     /// and before its corresponding `End` event are inside this element.
     /// Start and end events are guaranteed to be balanced.
-    Start(Tag<'a>),
+    Start(Tag),
     /// End of a tagged element.
     End(TagEnd),
     /// A text node.
     ///
     /// All text, outside and inside [`Tag`]s.
-    Text(CowStr<'a>),
+    Text(String),
     /// An [inline code node](https://spec.commonmark.org/0.31.2/#code-spans).
     ///
     /// ```markdown
     /// `code`
     /// ```
-    Code(CowStr<'a>),
+    Code(String),
     /// An inline math environment node.
     /// Requires [`Options::ENABLE_MATH`].
     ///
     /// ```markdown
     /// $math$
     /// ```
-    InlineMath(CowStr<'a>),
+    InlineMath(String),
     /// A display math environment node.
     /// Requires [`Options::ENABLE_MATH`].
     ///
     /// ```markdown
     /// $$math$$
     /// ```
-    DisplayMath(CowStr<'a>),
+    DisplayMath(String),
     /// An HTML node.
     ///
     /// A line of HTML inside [`Tag::HtmlBlock`] includes the line break.
-    Html(CowStr<'a>),
+    Html(String),
     /// An [inline HTML node](https://spec.commonmark.org/0.31.2/#raw-html).
     ///
     /// Contains only the tag itself, e.g. `<open-tag>`, `</close-tag>` or `<!-- comment -->`.
     ///
     /// **Note**: Under some conditions HTML can also be parsed as an HTML Block, see [`Tag::HtmlBlock`] for details.
-    InlineHtml(CowStr<'a>),
+    InlineHtml(String),
     /// A metadata block
     MetadataBlock(String),
 
@@ -403,7 +409,7 @@ pub enum Event<'a> {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Tag<'a> {
+pub enum Tag {
     /// A paragraph of text and other inline elements.
     Paragraph,
 
@@ -415,10 +421,10 @@ pub enum Tag<'a> {
     /// `id`, `classes` and `attrs` are only parsed and populated with [`Options::ENABLE_HEADING_ATTRIBUTES`], `None` or empty otherwise.
     Heading {
         level: HeadingLevel,
-        id: Option<CowStr<'a>>,
-        classes: Vec<CowStr<'a>>,
+        id: Option<String>,
+        classes: Vec<String>,
         /// The first item of the tuple is the attr and second one the value.
-        attrs: Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
+        attrs: Vec<(String, Option<String>)>,
     },
 
     /// A block quote.
@@ -433,7 +439,7 @@ pub enum Tag<'a> {
     /// ```
     BlockQuote(Option<BlockQuoteKind>),
     /// A code block.
-    CodeBlock(CodeBlockKind<'a>),
+    CodeBlock(CodeBlockKind),
 
     /// An HTML block.
     ///
@@ -499,20 +505,20 @@ pub enum Tag<'a> {
     /// A link.
     Link {
         link_type: LinkType,
-        dest_url: CowStr<'a>,
-        title: CowStr<'a>,
+        dest_url: String,
+        title: String,
         /// Identifier of reference links, e.g. `world` in the link `[hello][world]`.
-        id: CowStr<'a>,
+        id: String,
     },
 
     /// An image. The first field is the link type, the second the destination URL and the third is a title,
     /// the fourth is the link identifier.
     Image {
         link_type: LinkType,
-        dest_url: CowStr<'a>,
-        title: CowStr<'a>,
+        dest_url: String,
+        title: String,
         /// Identifier of reference links, e.g. `world` in the link `[hello][world]`.
-        id: CowStr<'a>,
+        id: String,
     },
 
     /// A reference to a footnote, which will be followed by all the events belonging to it
@@ -521,7 +527,7 @@ pub enum Tag<'a> {
     /// [^1]
     /// ```
     Footnote {
-        name: CowStr<'a>,
+        name: String,
         number: usize,
     },
 }
@@ -556,12 +562,21 @@ pub enum TagEnd {
     Link,
     Image,
 }
+
+/// Codeblock kind.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CodeBlockKind {
+    Indented,
+    /// The value contained in the tag describes the language of the code, which may be empty.
+    Fenced(String),
+}
+
 use std::collections::HashMap;
 
 use anyhow::{Context as _, Result, bail};
 use jiff::civil::Date;
 use pulldown_cmark::{
-    Alignment, BlockQuoteKind, CodeBlockKind, CowStr, Event as CE, HeadingLevel, LinkType,
-    MetadataBlockKind, Options, Parser as CmarkParser, Tag as CTag, TagEnd as CTagEnd,
+    Alignment, BlockQuoteKind, CodeBlockKind as CCodeBlockKind, CowStr, Event as CE, HeadingLevel,
+    LinkType, MetadataBlockKind, Options, Parser as CmarkParser, Tag as CTag, TagEnd as CTagEnd,
 };
 use serde::Deserialize;

@@ -12,7 +12,7 @@ impl Renderer {
 }
 
 struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
-    events: IntoIter<Event<'i>>,
+    events: Iter<'i, Event>,
     post_meta: &'m PostRootMeta,
     output: IoWriter<BufWriter<O>>,
     outer: &'r mut Renderer,
@@ -77,7 +77,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         Ok(result)
     }
 
-    pub fn process_event(&mut self, event: Event<'i>) -> Result<()> {
+    pub fn process_event(&mut self, event: &Event) -> Result<()> {
         use Event as E;
         match event {
             E::Start(tag) => self.start_tag(tag)?,
@@ -120,7 +120,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                     r#"
                     <svg height="16px" width="16px" class="task-marker">{}</svg>
                 "#,
-                    if state {
+                    if *state {
                         format!(r#"<use href="{PREFIX}/public/check.svg#check"></use>"#)
                     } else {
                         String::new()
@@ -135,7 +135,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         Ok(())
     }
 
-    pub fn start_tag(&mut self, tag: Tag) -> Result<()> {
+    pub fn start_tag(&mut self, tag: &Tag) -> Result<()> {
         match tag {
             Tag::Footnote { name, number } => {
                 // <label class="footnote" id="{name}-label" for="{name}-input">{number}</label>
@@ -298,10 +298,10 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         Ok(())
     }
 
-    fn end_tag(&mut self, tag_end: TagEnd) -> Result<()> {
+    fn end_tag(&mut self, tag_end: &TagEnd) -> Result<()> {
         match tag_end {
             TagEnd::List(ordered) => {
-                if ordered {
+                if *ordered {
                     self.write("</ol>")?;
                 } else {
                     self.write("</ul>")?;
@@ -412,7 +412,7 @@ impl Renderer {
         dev: bool,
     ) -> Result<PostRootMeta> {
         let ParseResult { root_meta, events } = parser::parse(source)?;
-        let events = events.into_iter();
+        let events = events.iter();
         let post_meta: PostRootMeta =
             toml::from_str(&root_meta).context("invalid root metadata")?;
         let mut renderer = RendererInner {
@@ -567,16 +567,16 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
 
 use crate::{
     PREFIX, PostMeta,
-    parser::{self, Event, ParseResult, PostRootMeta, Tag, TagEnd},
+    parser::{self, CodeBlockKind, Event, ParseResult, PostRootMeta, Tag, TagEnd},
 };
 use anyhow::{Context, Result};
-use pulldown_cmark::{Alignment, BlockQuoteKind, CodeBlockKind, LinkType};
+use pulldown_cmark::{Alignment, BlockQuoteKind, LinkType};
 use pulldown_cmark_escape::IoWriter;
 use pulldown_cmark_escape::StrWrite;
 use std::{
     fmt,
     io::{self, BufWriter, Write},
-    vec::IntoIter,
+    slice::Iter,
 };
 
 use crate::typst::TypstCompiler;
