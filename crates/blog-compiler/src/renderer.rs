@@ -34,13 +34,14 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         {dev_script}
     </head>
     <body>
-        <div class="post">
-            <div class="head">
+        <main class="post">
+            <header class="head">
                 <h1 class="title">{title}</h1>
                 <div class="tags">{tags}</div>
                 <p class="date">{date}</h1>
-            </div>
+            </header>
             <hr class="section-split" />
+            <!-- div here is used just for positioning, the semantic element for the body here is `<main>` -->
             <div class="body">
         "#,
             title = self.post_meta.title,
@@ -59,7 +60,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
         self.write(
             r#"
             </div>
-        </div>
+        </main>
     </body>
 </html>
             "#,
@@ -267,7 +268,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 self.write(r#"<a class="a" href=""#)?;
                 if dest_url.starts_with('/') {
                     self.write(PREFIX)?;
-                } else if !dest_url.contains("://") {
+                } else if !dest_url.contains("://") && !dest_url.starts_with('#') {
                     self.write_fmt(format_args!("{PREFIX}/{}", { self.slug }))?;
                 }
                 self.write_escaped_href(&dest_url)?;
@@ -283,7 +284,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 title,
                 id: _,
             } => {
-                self.write_fmt(format_args!(r#"<img src="{PREFIX}/{}/"#, { self.slug }))?;
+                self.write_fmt(format_args!(r#"<img src="{PREFIX}/{}"#, { self.slug }))?;
                 self.write_escaped_href(&dest_url)?;
                 self.write("\" alt=\"")?;
                 self.raw_text()?;
@@ -440,13 +441,16 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
             write!(&mut tags, r#"<span class="tag">{tag}</span>"#)?;
         }
 
+        // prerender the posts so they 1. work without javascript, and 2. don't cause lag on startup from `fetch`ing them
         write!(
             &mut posts,
             r#"
                 <article class="post-embed">
-                    <a class="block-link" href="/blog/{slug}">
-                        <h1 class="title on-container">{title}</h1>
-                    </a>
+                    <header>
+                        <a class="block-link" href="/blog/{slug}">
+                            <h1 class="title on-container">{title}</h1>
+                        </a>
+                    </header>
                     <div class="tags">{tags}</div>
                     <p class="date">{date}</p>
                 </article>
@@ -490,9 +494,11 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
 
                     postsContainer.innerHTML += `
                         <article class="post-embed">
-                            <a class="block-link" href="/blog/${{post.slug}}">
-                                <h1 class="title on-container">${{post.title}}</h1>
-                            </a>
+                            <header>
+                                <a class="block-link" href="/blog/${{post.slug}}">
+                                    <h1 class="title on-container">${{post.title}}</h1>
+                                </a>
+                            </header>
                             <div class="tags">${{tagsString}}</div>
                             <p class="date">${{post.formatted_date}}</p>
                         </article>
@@ -523,8 +529,8 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
         </script>
     </head>
     <body>
-        <div class="post">
-            <div class="head">
+        <main class="post">
+            <header class="head">
                 <h1 class="title">Cookie's Blog</h1>
                 <div class="tags">
                     <span class="tag">Gamedev</span>
@@ -539,13 +545,13 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
                     occasional devlogs or random side-tangents. Hope you enjoy
                     it!
                 </p>
-            </div>
+            </header>
             <hr class="section-split" />
             <div id="search-container"></div>
-            <div class="posts-container">
+            <section class="posts-container">
                 {posts}
-            </div>
-        </div>
+            </section>
+        </main>
     </body>
 </html>
 "##,
