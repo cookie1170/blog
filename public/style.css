@@ -44,6 +44,10 @@ body {
     margin: 1rem 0;
 }
 
+.search-bar {
+    margin: 1rem 0;
+}
+
 .search-bar input {
     background-color: var(--container);
     border: var(--container-2) solid 1px;
