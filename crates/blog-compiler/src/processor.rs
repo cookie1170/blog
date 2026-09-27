@@ -6,8 +6,8 @@ pub struct Processor<P: Process> {
 }
 
 pub trait Process {
-    type Output: Debug = ();
-    type Input: PartialEq + Debug = ();
+    type Output = ();
+    type Input: PartialEq = ();
 
     fn execute(&mut self, input: &Self::Input) -> Result<Self::Output>;
 
@@ -126,12 +126,12 @@ pub struct CopyDir {
 
 #[macro_export]
 macro_rules! paths {
-    () => {
-        fn in_path(&self) -> &Path {
+    {} => {
+        fn in_path(&self) -> &std::path::Path {
             &self.in_path
         }
 
-        fn out_path(&self) -> &Path {
+        fn out_path(&self) -> &std::path::Path {
             &self.out_path
         }
     };

@@ -1,27 +1,24 @@
 pub const DATE_FORMAT: &str = "%d %B %Y";
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct Renderer {
     typst: TypstCompiler,
+    in_path: PathBuf,
+    out_path: PathBuf,
 }
 
-impl Renderer {
-    pub fn new() -> Self {
-        let typst = TypstCompiler::new();
-        Self { typst }
-    }
-}
-
-struct RendererInner<'i, 'm, 'r, 's, O: io::Write> {
+struct RendererInner<'i, 'm, 'r, O: io::Write> {
     events: Iter<'i, Event>,
-    post_meta: &'m PostRootMeta,
+    meta: &'m PostMeta,
+    metas: &'m [PostMeta],
     output: IoWriter<BufWriter<O>>,
-    outer: &'r mut Renderer,
-    slug: &'s str,
+    typst: &'r mut TypstCompiler,
     dev: bool,
 }
 
-impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
+impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
     pub fn write_beginning_html(&mut self) -> Result<()> {
+        let dev = self.dev;
         self.write_fmt(format_args!(
             r#"
 <!doctype html>
@@ -41,27 +38,76 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 <p class="date">{date}</h1>
             </header>
             <hr class="section-split" />
-            <!-- div here is used just for positioning, the semantic element for the body here is `<main>` -->
-            <div class="body">
         "#,
-            title = self.post_meta.title,
-            date = self.post_meta.date.strftime(DATE_FORMAT),
+            title = self.meta.title,
+            date = self.meta.date.strftime(DATE_FORMAT),
             tags = self.format_tags()?,
-            dev_script = if self.dev {
-                format!(r#"<script src="{}/dev_public/reload.js"></script>"#, PREFIX)
-            } else {
-                String::new()
-            }
+            dev_script = fmt::from_fn(|f| {
+                if dev {
+                    write!(
+                        f,
+                        r#"<script src="{}/dev_public/reload.js"></script>"#,
+                        PREFIX
+                    )
+                } else {
+                    Ok(())
+                }
+            })
         ))?;
         Ok(())
     }
 
     pub fn write_ending_html(&mut self) -> Result<()> {
+        if self.meta.prev.is_some() || self.meta.next.is_some() {
+            self.write(
+                r#"
+        <hr class="section-split" />
+                "#,
+            )?;
+        }
+
+        if let Some(ref prev) = self.meta.prev {
+            let Some(prev_post) = self.metas.iter().find(|p| p.slug == *prev) else {
+                bail!("previous post '{prev}' not found");
+            };
+
+            self.write_fmt(format_args!(
+                r#"
+        <div class="prev">
+            <a class="a" href="{PREFIX}/{prev}">
+                <svg height="16px" width="16px">
+                    <use href="{PREFIX}/public/left.svg#left">
+                </svg>
+                {prev_title}
+            </a>
+        </div>
+                "#,
+                prev_title = prev_post.title,
+            ))?;
+        }
+
+        if let Some(ref next) = self.meta.next {
+            let Some(next_post) = self.metas.iter().find(|p| p.slug == *next) else {
+                bail!("next post '{next}' not found");
+            };
+
+            self.write_fmt(format_args!(
+                r#"
+        <div class="next">
+            <a class="a" href="{PREFIX}/{next}">
+                 {next_title}
+                 <svg height="16px" width="16px">
+                     <use href="{PREFIX}/public/right.svg#right">
+                 </svg>
+            </a>
+        </div>
+                "#,
+                next_title = next_post.title,
+            ))?;
+        }
         self.write(
             r#"
-            </div>
-        </main>
-    </body>
+    </main>
 </html>
             "#,
         )?;
@@ -70,7 +116,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
 
     pub fn format_tags(&self) -> Result<String> {
         let mut result = String::with_capacity(64);
-        for tag in &self.post_meta.tags {
+        for tag in &self.meta.tags {
             write!(&mut result, r#"<div class="tag">{}</div>"#, tag)?;
         }
 
@@ -90,23 +136,15 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 self.write("</code>")?;
             }
             E::InlineMath(math) => {
-                let result = self
-                    .outer
-                    .typst
-                    .compile(math.to_string())
-                    .with_context(|| {
-                        format!("failed to compile typst expression '{}'", math.trim())
-                    })?;
+                let result = self.typst.compile(math.to_string()).with_context(|| {
+                    format!("failed to compile typst expression '{}'", math.trim())
+                })?;
                 self.write(result)?
             }
             E::DisplayMath(math) => {
-                let result = self
-                    .outer
-                    .typst
-                    .compile(math.to_string())
-                    .with_context(|| {
-                        format!("failed to compile typst expression '{}'", math.trim())
-                    })?;
+                let result = self.typst.compile(math.to_string()).with_context(|| {
+                    format!("failed to compile typst expression '{}'", math.trim())
+                })?;
                 self.write("<p>")?;
                 self.write(result)?;
                 self.write("</p>")?;
@@ -120,11 +158,13 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                     r#"
                     <svg height="16px" width="16px" class="task-marker">{}</svg>
                 "#,
-                    if *state {
-                        format!(r#"<use href="{PREFIX}/public/check.svg#check"></use>"#)
-                    } else {
-                        String::new()
-                    }
+                    fmt::from_fn(|f| {
+                        if *state {
+                            write!(f, r#"<use href="{PREFIX}/public/check.svg#check"></use>"#)
+                        } else {
+                            Ok(())
+                        }
+                    })
                 ))?;
             }
             E::MetadataBlock(meta) => {
@@ -269,7 +309,7 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 if dest_url.starts_with('/') {
                     self.write(PREFIX)?;
                 } else if !dest_url.contains("://") && !dest_url.starts_with('#') {
-                    self.write_fmt(format_args!("{PREFIX}/{}", { self.slug }))?;
+                    self.write_fmt(format_args!("{PREFIX}/{}", self.meta.slug))?;
                 }
                 self.write_escaped_href(&dest_url)?;
                 if !title.is_empty() {
@@ -284,7 +324,16 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
                 title,
                 id: _,
             } => {
-                self.write_fmt(format_args!(r#"<img src="{PREFIX}/{}"#, { self.slug }))?;
+                self.write_fmt(format_args!(
+                    r#"<img src="{}"#,
+                    fmt::from_fn(|f| {
+                        if !dest_url.starts_with('/') && !dest_url.contains("://") {
+                            write!(f, "{PREFIX}/{}/images/", self.meta.slug)
+                        } else {
+                            Ok(())
+                        }
+                    })
+                ))?;
                 self.write_escaped_href(&dest_url)?;
                 self.write("\" alt=\"")?;
                 self.raw_text()?;
@@ -403,25 +452,55 @@ impl<'i, 'm, 'r, 's, O: io::Write> RendererInner<'i, 'm, 'r, 's, O> {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct RenderInput {
+    pub meta: PostMeta,
+    pub events: Vec<Event>,
+    pub metas: Vec<PostMeta>,
+    pub dev: bool,
+}
+
 impl Renderer {
-    pub fn render<O: io::Write>(
-        &mut self,
-        source: &str,
-        slug: &str,
-        output: BufWriter<O>,
-        dev: bool,
-    ) -> Result<PostRootMeta> {
-        let ParseResult { root_meta, events } = parser::parse(source)?;
+    pub fn new(in_path: PathBuf, out_path: PathBuf) -> Self {
+        let typst = TypstCompiler::new();
+        Self {
+            typst,
+            in_path,
+            out_path,
+        }
+    }
+}
+
+impl Process for Renderer {
+    type Input = RenderInput;
+
+    fn execute(&mut self, input: &Self::Input) -> Result<Self::Output> {
+        info!("compiling post '{}'", input.meta.slug);
+
+        let RenderInput {
+            meta,
+            events,
+            metas,
+            dev,
+        } = input;
         let events = events.iter();
-        let post_meta: PostRootMeta =
-            toml::from_str(&root_meta).context("invalid root metadata")?;
+        let html_path = self.out_path.join("index.html");
+        let output = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&html_path)
+            .with_context(|| format!("failed to open '{}'", html_path.display()))?;
+
+        let output = BufWriter::new(output);
+
         let mut renderer = RendererInner {
             events,
-            post_meta: &post_meta,
+            meta: &meta,
+            metas: &metas,
             output: IoWriter(output),
-            outer: self,
-            slug,
-            dev,
+            typst: &mut self.typst,
+            dev: *dev,
         };
 
         renderer.write_beginning_html()?;
@@ -429,11 +508,13 @@ impl Renderer {
             renderer.process_event(event)?;
         }
         renderer.write_ending_html()?;
-        Ok(post_meta)
+        Ok(())
     }
+
+    paths! {}
 }
 
-pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Result<()> {
+pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Result<()> {
     let mut posts = String::with_capacity(512 * metas.len());
     for post in metas {
         let mut tags = String::with_capacity(40 * post.tags.len());
@@ -555,11 +636,16 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
     </body>
 </html>
 "##,
-        dev_script = if dev {
-            format!(r#"<script src="{PREFIX}/dev_public/reload.js"></script>"#)
-        } else {
-            String::new()
-        }
+        dev_script = fmt::from_fn(|f| {
+            if dev {
+                write!(
+                    f,
+                    r#"<script src="{PREFIX}/dev_public/reload.js"></script>"#
+                )
+            } else {
+                Ok(())
+            }
+        })
     )?;
 
     Ok(())
@@ -567,16 +653,21 @@ pub fn write_index(mut writer: impl Write, metas: &[&PostMeta], dev: bool) -> Re
 
 use crate::{
     PREFIX, PostMeta,
-    parser::{self, CodeBlockKind, Event, ParseResult, PostRootMeta, Tag, TagEnd},
+    parser::{CodeBlockKind, Event, Tag, TagEnd},
+    paths,
+    processor::Process,
 };
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use pulldown_cmark::{Alignment, BlockQuoteKind, LinkType};
 use pulldown_cmark_escape::IoWriter;
 use pulldown_cmark_escape::StrWrite;
 use std::{
     fmt,
+    fs::OpenOptions,
     io::{self, BufWriter, Write},
+    path::PathBuf,
     slice::Iter,
 };
+use tracing::info;
 
 use crate::typst::TypstCompiler;

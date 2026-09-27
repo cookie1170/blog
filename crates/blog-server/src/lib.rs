@@ -42,7 +42,7 @@ pub async fn serve(blog: &mut Processor<Blog>) -> anyhow::Result<()> {
                 }
         } => (),
         _ = async {
-            let addr = "127.0.0.1:8000";
+            let addr = "127.0.0.1:8080";
             info!("serving at {addr}");
             server.run(addr.parse::<SocketAddrV4>().unwrap()).await;
         } => (),

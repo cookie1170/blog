@@ -1,3 +1,4 @@
+#[derive(PartialEq, Debug, Clone)]
 pub struct TypstCompiler {
     world: TypstWorld,
 }
@@ -126,6 +127,30 @@ impl World for TypstWorld {
 
     fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
         None
+    }
+}
+
+impl std::fmt::Debug for TypstWorld {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TypstWorld")
+            .field("text", &self.text)
+            .field("library", &self.library)
+            .field("main_file_id", &self.main_file_id)
+            .finish()
+    }
+}
+
+impl PartialEq for TypstWorld {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+            && self.library == other.library
+            && self.main_file_id == other.main_file_id
+    }
+}
+
+impl Clone for TypstWorld {
+    fn clone(&self) -> Self {
+        Self::new(self.text.clone())
     }
 }
 

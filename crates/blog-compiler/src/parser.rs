@@ -1,6 +1,31 @@
+#[derive(PartialEq, Debug, Clone)]
 pub struct ParseResult {
-    pub root_meta: String,
+    pub meta: PostRootMeta,
     pub events: Vec<Event>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct PostRootMeta {
+    pub title: String,
+    pub slug: String,
+    pub date: Date,
+    pub tags: Vec<String>,
+    pub prev: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct DeserializedPostRootMeta {
+    pub title: String,
+    pub date: Date,
+    pub tags: Vec<String>,
+    pub prev: Option<String>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct Parser {
+    pub in_path: PathBuf,
+    pub out_path: PathBuf,
+    pub slug: String,
 }
 
 #[derive(Debug)]
@@ -9,7 +34,7 @@ struct Footnote {
     events: Vec<Event>,
 }
 
-struct Parser<'i> {
+struct ParserInner<'i> {
     events: Vec<Event>,
     footnotes: HashMap<CowStr<'i>, Footnote>,
     current_footnote: Option<(CowStr<'i>, Footnote)>,
@@ -21,81 +46,94 @@ struct Parser<'i> {
     ignore: bool,
 }
 
-#[derive(Deserialize, PartialEq, Debug, Clone)]
-pub struct PostRootMeta {
-    pub title: String,
-    pub date: Date,
-    pub tags: Vec<String>,
-}
+impl Process for Parser {
+    type Output = ParseResult;
 
-pub fn parse(source: &str) -> Result<ParseResult> {
-    let options = Options::ENABLE_GFM
-        | Options::ENABLE_MATH
-        | Options::ENABLE_TABLES
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_SUBSCRIPT
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_SUPERSCRIPT
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS;
-    let mut cmark_parser =
-        pulldown_cmark::TextMergeStream::new(CmarkParser::new_ext(source, options));
+    fn execute(&mut self, _: &Self::Input) -> Result<Self::Output> {
+        info!("parsing post '{}'", self.slug);
 
-    let meta;
-    if let Some(CE::Start(CTag::MetadataBlock(MetadataBlockKind::PlusesStyle))) =
-        cmark_parser.next()
-        && let Some(CE::Text(m)) = cmark_parser.next()
-        && let Some(CE::End(CTagEnd::MetadataBlock(MetadataBlockKind::PlusesStyle))) =
+        let markdown = self.in_path.join(&self.slug).with_extension("md");
+        let markdown = fs::read_to_string(&markdown)
+            .with_context(|| format!("failed to read '{}'", markdown.display()))?;
+
+        let options = Options::ENABLE_GFM
+            | Options::ENABLE_MATH
+            | Options::ENABLE_TABLES
+            | Options::ENABLE_FOOTNOTES
+            | Options::ENABLE_SUBSCRIPT
+            | Options::ENABLE_TASKLISTS
+            | Options::ENABLE_SUPERSCRIPT
+            | Options::ENABLE_STRIKETHROUGH
+            | Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS;
+        let mut cmark_parser =
+            pulldown_cmark::TextMergeStream::new(CmarkParser::new_ext(&markdown, options));
+
+        let meta;
+        if let Some(CE::Start(CTag::MetadataBlock(MetadataBlockKind::PlusesStyle))) =
             cmark_parser.next()
-    {
-        meta = m;
-    } else {
-        bail!("expected plus-delimited metadata block at the start");
-    }
-
-    let mut events = Vec::with_capacity(1024);
-    // HACK: we wrap all the events in `Option` so that we can move out of them
-    // in `scan_footnotes` or for `process_events` separately. the set of events will not overlap
-    events.extend(cmark_parser.map(Some));
-
-    let mut parser = Parser {
-        events: Vec::with_capacity(1024),
-        footnotes: HashMap::with_capacity(8),
-        current_footnote: None,
-        current_alignments: Vec::default(),
-        current_cell_index: 0,
-        is_table_header: false,
-        in_metadata_block: false,
-        current_metadata_block: String::new(),
-        ignore: false,
-    };
-
-    let mut iter = events.iter_mut();
-    while let Some(event) = iter.next() {
-        parser.scan_footnotes(event)?;
-    }
-
-    let mut iter = events.iter_mut();
-    while let Some(event) = iter.next() {
-        if !parser.is_footnote() && parser.ignore {
-            if let Some(CE::End(CTagEnd::FootnoteDefinition)) = event {
-                parser.ignore = false;
-            } else {
-                continue;
-            }
+            && let Some(CE::Text(m)) = cmark_parser.next()
+            && let Some(CE::End(CTagEnd::MetadataBlock(MetadataBlockKind::PlusesStyle))) =
+                cmark_parser.next()
+        {
+            meta = m;
+        } else {
+            bail!("expected plus-delimited metadata block at the start");
         }
-        // events that are between `CTag::FootnoteDefinition` and `CTagEnd::FootnoteDefinition`
-        // are `take()`n, but the rest are kept, so we're fine to `take()` and unwrap here
-        parser.process_event(event.take().unwrap())?;
+
+        let mut events = Vec::with_capacity(1024);
+        // HACK: we wrap all the events in `Option` so that we can move out of them
+        // in `scan_footnotes` or for `process_events` separately. the set of events will not overlap
+        events.extend(cmark_parser.map(Some));
+
+        let mut parser = ParserInner {
+            events: Vec::with_capacity(1024),
+            footnotes: HashMap::with_capacity(8),
+            current_footnote: None,
+            current_alignments: Vec::default(),
+            current_cell_index: 0,
+            is_table_header: false,
+            in_metadata_block: false,
+            current_metadata_block: String::new(),
+            ignore: false,
+        };
+
+        let mut iter = events.iter_mut();
+        while let Some(event) = iter.next() {
+            parser.scan_footnotes(event)?;
+        }
+
+        let mut iter = events.iter_mut();
+        while let Some(event) = iter.next() {
+            if !parser.is_footnote() && parser.ignore {
+                if let Some(CE::End(CTagEnd::FootnoteDefinition)) = event {
+                    parser.ignore = false;
+                } else {
+                    continue;
+                }
+            }
+            // events that are between `CTag::FootnoteDefinition` and `CTagEnd::FootnoteDefinition`
+            // are `take()`n, but the rest are kept, so we're fine to `take()` and unwrap here
+            parser.process_event(event.take().unwrap())?;
+        }
+
+        let meta: DeserializedPostRootMeta =
+            toml::from_str(&meta).context("invalid root metadata")?;
+        Ok(ParseResult {
+            meta: PostRootMeta {
+                title: meta.title,
+                slug: self.slug.clone(),
+                date: meta.date,
+                tags: meta.tags,
+                prev: meta.prev,
+            },
+            events: parser.events,
+        })
     }
 
-    Ok(ParseResult {
-        root_meta: meta.into(),
-        events: parser.events,
-    })
+    paths! {}
 }
 
-impl<'i> Parser<'i> {
+impl<'i> ParserInner<'i> {
     fn scan_footnotes(&mut self, event: &mut Option<CE<'i>>) -> Result<()> {
         match event {
             Some(CE::Start(CTag::FootnoteDefinition(name))) => {
@@ -571,8 +609,9 @@ pub enum CodeBlockKind {
     Fenced(String),
 }
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::PathBuf};
 
+use crate::{paths, processor::Process};
 use anyhow::{Context as _, Result, bail};
 use jiff::civil::Date;
 use pulldown_cmark::{
@@ -580,3 +619,4 @@ use pulldown_cmark::{
     LinkType, MetadataBlockKind, Options, Parser as CmarkParser, Tag as CTag, TagEnd as CTagEnd,
 };
 use serde::Deserialize;
+use tracing::info;

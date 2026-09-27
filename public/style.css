@@ -104,6 +104,27 @@ hr {
     border-radius: 500px;
 }
 
+.prev,
+.next {
+    width: 100%;
+    display: flex;
+}
+
+.prev a,
+.next a {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.prev {
+    justify-content: start;
+}
+
+.next {
+    justify-content: end;
+}
+
 /* elements */
 
 .head,
@@ -219,6 +240,11 @@ p {
 
 .a:hover {
     text-decoration: underline;
+}
+
+.a svg {
+    fill: var(--accent);
+    background-color: none;
 }
 
 .block-link {

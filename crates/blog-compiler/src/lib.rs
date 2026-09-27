@@ -7,12 +7,13 @@ mod typst;
 
 pub const PREFIX: &str = "/blog";
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct Blog {
     pub in_path: PathBuf,
     pub out_path: PathBuf,
     copy_public_dir: Processor<CopyDir>,
     copy_dev_public_dir: Processor<CopyDir>,
-    posts: Vec<Processor<Post>>,
+    posts: Vec<Post>,
     posts_path: PathBuf,
 }
 
@@ -36,12 +37,11 @@ impl Blog {
     }
 
     pub fn update_posts(&mut self) -> anyhow::Result<()> {
-        let posts_path = self.in_path.join("posts");
         self.posts
-            .retain(|p| fs::exists(posts_path.join(&p.slug)).is_ok_and(|b| b));
+            .retain(|p| fs::exists(self.posts_path.join(&p.slug)).is_ok_and(|b| b));
 
-        for post in fs::read_dir(&posts_path)
-            .with_context(|| format!("failed to read {}", posts_path.display()))?
+        for post in fs::read_dir(&self.posts_path)
+            .with_context(|| format!("failed to read {}", self.posts_path.display()))?
         {
             let post = post.context("failed to read post")?;
             if !post
@@ -57,8 +57,7 @@ impl Blog {
                 .map(OsStr::to_string_lossy)
                 .context("failed to get post file name")?;
             if !self.posts.iter().any(|p| p.slug == slug) {
-                let post =
-                    Processor::new(Post::new(slug.into_owned(), &posts_path, &self.out_path));
+                let post = Post::new(slug.into_owned(), &self.posts_path, &self.out_path);
                 self.posts.push(post);
             }
         }
@@ -83,16 +82,66 @@ impl Process for Blog {
             self.copy_dev_public_dir.run()?;
         }
 
-        let mut post_metas = Vec::with_capacity(self.posts.len());
+        let mut parse_results = Vec::with_capacity(self.posts.len());
 
         for post in &mut self.posts {
-            let post_path = self.posts_path.join(&post.slug);
             let meta = post
-                .run_with(opts.dev)
-                .with_context(|| format!("failed to compile post at '{}'", post_path.display()))?;
-            post_metas.push(meta)
+                .parser
+                .run()
+                .with_context(|| format!("failed to parse post '{}'", post.slug))?;
+            parse_results.push(meta.clone())
         }
-        post_metas.sort_by(|a, b| {
+
+        let mut processed_results = parse_results
+            .into_iter()
+            .map(|p| {
+                (
+                    PostMeta {
+                        title: p.meta.title,
+                        slug: p.meta.slug,
+                        date: p.meta.date,
+                        tags: p.meta.tags,
+                        prev: p.meta.prev,
+                        next: None,
+                    },
+                    p.events,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for i in 0..processed_results.len() {
+            let Some(prev) = processed_results[i].0.prev.clone() else {
+                continue;
+            };
+
+            let slug = processed_results[i].0.slug.clone();
+            let Some(prev_post) = processed_results.iter_mut().find(|p| p.0.slug == prev) else {
+                bail!(
+                    "previous post of '{}' not found",
+                    processed_results[i].0.slug
+                );
+            };
+
+            prev_post.0.next = Some(slug);
+        }
+
+        let mut metas: Vec<_> = processed_results.iter().map(|p| p.0.clone()).collect();
+        for (index, post) in self.posts.iter_mut().enumerate() {
+            let parse_result = processed_results[index].clone();
+            post.renderer
+                .run_with(RenderInput {
+                    meta: parse_result.0,
+                    events: parse_result.1,
+                    metas: metas.clone(),
+                    dev: opts.dev,
+                })
+                .with_context(|| format!("failed to render post '{}'", post.slug))?;
+
+            // if it fails, the post probably doesn't have an images folder!
+            let _ = post.copy_images.run();
+        }
+
+        metas.sort_by(|a, b| {
             if a.date == b.date {
                 a.cmp(b)
             } else {
@@ -109,7 +158,7 @@ impl Process for Blog {
             .open(&index_path)
             .with_context(|| format!("failed to open '{}'", index_path.display()))?;
 
-        renderer::write_index(index, &post_metas, opts.dev)
+        renderer::write_index(index, &metas, opts.dev)
             .with_context(|| format!("failed to write index page to '{}'", index_path.display()))?;
 
         let posts_json_path = self.out_path.join("posts.json");
@@ -120,7 +169,7 @@ impl Process for Blog {
             .open(&posts_json_path)
             .with_context(|| format!("failed to open '{}'", posts_json_path.display()))?;
 
-        serde_json::to_writer(posts_json, &post_metas)
+        serde_json::to_writer(posts_json, &metas)
             .with_context(|| format!("failed to write to '{}'", posts_json_path.display()))?;
 
         Ok(())
@@ -142,6 +191,8 @@ pub struct PostMeta {
     pub slug: String,
     pub date: Date,
     pub tags: Vec<String>,
+    pub prev: Option<String>,
+    pub next: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -151,6 +202,8 @@ pub struct SerializedPostMeta {
     pub date: Date,
     pub formatted_date: String,
     pub tags: Vec<String>,
+    pub prev: Option<String>,
+    pub next: Option<String>,
 }
 
 impl From<PostMeta> for SerializedPostMeta {
@@ -161,88 +214,52 @@ impl From<PostMeta> for SerializedPostMeta {
             date: value.date,
             formatted_date: value.date.strftime(DATE_FORMAT).to_string(),
             tags: value.tags,
+            prev: value.prev,
+            next: value.next,
         }
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct Post {
     slug: String,
-    in_path: PathBuf,
-    out_path: PathBuf,
-    renderer: Renderer,
+    renderer: Processor<Renderer>,
+    parser: Processor<Parser>,
     copy_images: Processor<CopyDir>,
 }
 
 impl Post {
     pub fn new(slug: String, posts: &Path, dist: &Path) -> Self {
-        let renderer = Renderer::new();
         let in_path = posts.join(&slug);
         let out_path = dist.join(&slug);
 
         Self {
-            slug,
-            renderer,
+            slug: slug.clone(),
             copy_images: Processor::new(CopyDir {
                 in_path: in_path.join("images"),
                 out_path: out_path.join("images"),
             }),
-            in_path,
-            out_path,
+            renderer: Processor::new(Renderer::new(in_path.clone(), out_path.clone())),
+            parser: Processor::new(Parser {
+                in_path,
+                out_path,
+                slug,
+            }),
         }
     }
 }
 
-impl Process for Post {
-    type Output = PostMeta;
-    type Input = bool;
-
-    fn execute(&mut self, dev: &bool) -> Result<PostMeta> {
-        info!("compiling post '{}'", self.slug);
-
-        let markdown = self.in_path.join(&self.slug).with_extension("md");
-        let markdown = fs::read_to_string(&markdown)
-            .with_context(|| format!("failed to read '{}'", markdown.display()))?;
-
-        let html_path = self.out_path.join("index.html");
-        let out_html = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&html_path)
-            .with_context(|| format!("failed to open '{}'", html_path.display()))?;
-
-        let out_html = BufWriter::new(out_html);
-
-        let meta = self
-            .renderer
-            .render(&markdown, &self.slug, out_html, *dev)
-            .context("failed to render html")?;
-
-        self.copy_images.run()?;
-
-        Ok(PostMeta {
-            title: meta.title,
-            slug: self.slug.clone(),
-            date: meta.date,
-            tags: meta.tags,
-        })
-    }
-
-    paths! {}
-}
-
-use anyhow::{Context, Result};
+use anyhow::{Context, bail};
 use jiff::civil::Date;
 use serde::Serialize;
 use std::{
     ffi::OsStr,
     fs::{self, OpenOptions},
-    io::BufWriter,
     path::{Path, PathBuf},
 };
-use tracing::*;
 
 use crate::{
+    parser::Parser,
     processor::{CopyDir, Process, Processor},
-    renderer::{DATE_FORMAT, Renderer},
+    renderer::{DATE_FORMAT, RenderInput, Renderer},
 };

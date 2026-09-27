@@ -7,11 +7,12 @@ tags = ["Test", "Useless", "Silly"]
 This is a **test blog post** to test this stuff[^stuff]. it's _very cool_![^cool]
 
 [^stuff]: This is, indeed, stuff
+
 [^cool]: Or is it? _vsauce music plays_
 
 ## With a header, even!
 
-And some more **bold**, _italic_, ~~strikethrough~~, ^superscript^, ~subscript~, `code`, [link] text!
+And some more **bold**, _italic_, ~~strikethrough~~, ^superscript^, ~~subscript~~, `code`, [link] text!
 
 [link]: https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
@@ -54,12 +55,12 @@ new org.springframework.aop.framework.AbstractSingletonProxyFactoryBean().SomeVe
 1. Ordered
 2. Lists
 
-|Tables  |Cool?    |Useful?  |
-|:------:|--------:|:--------|
-|This one|Yes!     |No!      |
-|Others  |Also yes!|Probably!|
+|  Tables  |     Cool? | Useful?   |
+| :------: | --------: | :-------- |
+| This one |      Yes! | No!       |
+|  Others  | Also yes! | Probably! |
 
 - [ ] Tasks
 - [x] Done!
 
-![Comfy](images/comfy.png "Comfy")
+![Comfy](comfy.png "Comfy")
