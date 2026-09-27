@@ -12,7 +12,7 @@
 }
 
 :root {
-    font-family: "PT Sans", sans-serif;
+    font-family: "Mulish", sans-serif;
     accent-color: var(--accent);
     clear: left;
 }
@@ -99,7 +99,7 @@ hr {
 .tag {
     background-color: var(--accent);
     color: var(--on-accent);
-    padding: 0 0.5rem;
+    padding: 0.1rem 0.5rem;
     /* big number. but 100% makes it an elipse for whatever reason */
     border-radius: 500px;
 }
@@ -208,6 +208,11 @@ input.footnote:checked + span.footnote {
 
 /* code blocks */
 
+code {
+    font-family: "Cookiosevka", monospace;
+    font-size: 0.85rem;
+}
+
 code.inline-code {
     background-color: var(--container);
     color: var(--on-container);
@@ -287,30 +292,47 @@ svg [fill="#ffffff"] {
 }
 
 @font-face {
-    font-family: "PT Sans";
+    font-family: "Mulish";
     font-style: normal;
-    font-weight: 400;
     font-display: swap;
-    src: url(/blog/public/fonts/PTSans-Regular.ttf) format("truetype");
+    src: url(/blog/public/fonts/Mulish-Variable.woff2) format("woff2");
 }
 @font-face {
-    font-family: "PT Sans";
+    font-family: "Mulish";
     font-style: italic;
+    font-display: swap;
+    src: url(/blog/public/fonts/Mulish-Italic-Variable.woff2) format("woff2");
+}
+
+@font-face {
+    font-family: "Cookiosevka";
+    font-display: swap;
     font-weight: 400;
-    font-display: swap;
-    src: url(/blog/public/fonts/PTSans-Italic.ttf) format("truetype");
-}
-@font-face {
-    font-family: "PT Sans";
-    font-style: italic;
-    font-weight: 700;
-    font-display: swap;
-    src: url(/blog/public/fonts/PTSans-BoldItalic.ttf) format("truetype");
-}
-@font-face {
-    font-family: "PT Sans";
+    font-stretch: normal;
     font-style: normal;
-    font-weight: 700;
+    src: url("/blog/public/fonts/Cookiosevka-Extended.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Cookiosevka";
+    font-weight: 400;
+    font-style: italic;
     font-display: swap;
-    src: url(/blog/public/fonts/PTSans-Bold.ttf) format("truetype");
+    src: url("/blog/public/fonts/Cookiosevka-ExtendedItalic.woff2")
+        format("woff2");
+}
+@font-face {
+    font-family: "Cookiosevka";
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+    src: url("/blog/public/fonts/Cookiosevka-ExtendedBold.woff2")
+        format("woff2");
+}
+@font-face {
+    font-family: "Cookiosevka";
+    font-weight: 700;
+    font-style: italic;
+    font-display: swap;
+    src: url("/blog/public/fonts/Cookiosevka-ExtendedBoldItalic.woff2")
+        format("woff2");
 }

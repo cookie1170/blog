@@ -1,0 +1,55 @@
+[buildPlans.Cookiosevka]
+family = "Cookiosevka"
+spacing = "normal"
+serifs = "sans"
+noCvSs = true
+exportGlyphNames = false
+
+[buildPlans.Cookiosevka.variants]
+inherits = "ss07"
+
+[buildPlans.Cookiosevka.variants.design]
+three = "flat-top-serifless"
+four = "semi-open-serifless"
+six = "straight-bar"
+nine = "straight-bar"
+zero = "dotted"
+i = "hooky"
+tilde = "low"
+asterisk = "penta-low"
+ampersand = "upper-open"
+at = "fourfold"
+dollar = "open-cap"
+cent = "open-cap"
+percent = "rings-segmented-slash"
+question = "smooth"
+pilcrow = "low"
+decorative-angle-brackets = "middle"
+lig-ltgteq = "flat"
+lig-equal-chain = "with-notch"
+lig-hyphen-chain = "with-notch"
+lig-plus-chain = "without-notch"
+lig-double-arrow-bar = "without-notch"
+lig-single-arrow-bar = "without-notch"
+
+[buildPlans.Cookiosevka.weights.Regular]
+shape = 400
+menu = 400
+css = 400
+
+[buildPlans.Cookiosevka.weights.Bold]
+shape = 700
+menu = 700
+css = 700
+
+[buildPlans.Cookiosevka.slopes.Upright]
+angle = 0
+shape = "upright"
+menu = "upright"
+css = "normal"
+
+[buildPlans.Cookiosevka.slopes.Italic]
+angle = 9.4
+shape = "italic"
+menu = "italic"
+css = "italic"
