@@ -8,7 +8,7 @@ pub struct Renderer {
 }
 
 struct RendererInner<'i, 'm, 'r, O: io::Write> {
-    events: Iter<'i, Event>,
+    events: Peekable<Iter<'i, Event>>,
     meta: &'m PostMeta,
     metas: &'m [PostMeta],
     output: IoWriter<BufWriter<O>>,
@@ -179,7 +179,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
         match tag {
             Tag::Footnote { name, number } => {
                 // <label class="footnote" id="{name}-label" for="{name}-input">{number}</label>
-                self.write(" <label class=\"footnote\" for=\"")?;
+                self.write("<label class=\"footnote\" for=\"")?;
                 self.write_escaped_attr(&name)?;
                 self.write_fmt(format_args!("-input\">{number}</label>"))?;
 
@@ -278,7 +278,17 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 self.write_fmt(format_args!("<th class=\"{alignment_text}\">"))?;
             }
             Tag::HtmlBlock => { /* nop */ }
-            Tag::Paragraph => self.write("<p>")?,
+            Tag::Paragraph => {
+                self.write("<p")?;
+                if self
+                    .events
+                    .peek()
+                    .is_some_and(|e| matches!(e, Event::Start(Tag::Image { .. })))
+                {
+                    self.write(r#" class="center""#)?;
+                }
+                self.write(">")?;
+            }
             Tag::Emphasis => self.write("<em>")?,
             Tag::Strong => self.write("<strong>")?,
             Tag::Strikethrough => self.write("<del>")?,
@@ -324,26 +334,42 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
-                self.write_fmt(format_args!(
-                    r#"<img src="{}"#,
-                    fmt::from_fn(|f| {
-                        if !dest_url.starts_with('/') && !dest_url.contains("://") {
-                            write!(f, "{PREFIX}/{}/images/", self.meta.slug)
-                        } else {
-                            Ok(())
-                        }
-                    })
-                ))?;
-                self.write_escaped_href(&dest_url)?;
-                self.write("\" alt=\"")?;
-                self.raw_text()?;
-                if !title.is_empty() {
-                    self.write("\" title=\"")?;
-                    self.write_escaped_attr(&title)?;
+                let url_prefix = fmt::from_fn(|f| {
+                    if !dest_url.starts_with('/') && !dest_url.contains("://") {
+                        write!(f, "{PREFIX}/{}/images/", self.meta.slug)?;
+                    }
+                    Ok(())
+                });
+
+                if dest_url.ends_with(".webm") {
+                    self.write_fmt(format_args!("<video autoplay loop muted playinline"))?;
+                    self.write_image_meta(title)?;
+                    self.write(">")?;
+                    self.write_fmt(format_args!(r#"<source src="{url_prefix}"#))?;
+                    self.write_escaped_href(dest_url)?;
+                    self.write(r#"" type="video/webm">"#)?;
+                    self.write("</video>")?;
+                } else {
+                    self.write_fmt(format_args!(r#"<img src="{url_prefix}"#,))?;
+                    self.write_escaped_href(&dest_url)?;
+                    self.write("\"")?;
+                    self.write_image_meta(title)?;
+                    self.write(" />")?;
                 }
-                self.write("\" />")?;
             }
         }
+        Ok(())
+    }
+
+    fn write_image_meta(&mut self, title: &str) -> Result<(), Error> {
+        self.write(r#" alt=""#)?;
+        self.raw_text()?;
+        if !title.is_empty() {
+            self.write(r#"" title=""#)?;
+            self.write_escaped_attr(&title)?;
+        }
+        self.write("\"")?;
+
         Ok(())
     }
 
@@ -483,7 +509,7 @@ impl Process for Renderer {
             metas,
             dev,
         } = input;
-        let events = events.iter();
+        let events = events.iter().peekable();
         let html_path = self.out_path.join("index.html");
         let output = OpenOptions::new()
             .write(true)
@@ -612,7 +638,7 @@ pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Res
     <body>
         <main class="post">
             <header class="head">
-                <h1 class="title">Cookie's Blog</h1>
+                <h1 class="title">Cookie's blog</h1>
                 <div class="tags">
                     <span class="tag">Gamedev</span>
                     <span class="tag">Programming</span>
@@ -657,7 +683,7 @@ use crate::{
     paths,
     processor::Process,
 };
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use pulldown_cmark::{Alignment, BlockQuoteKind, LinkType};
 use pulldown_cmark_escape::IoWriter;
 use pulldown_cmark_escape::StrWrite;
@@ -665,6 +691,7 @@ use std::{
     fmt,
     fs::OpenOptions,
     io::{self, BufWriter, Write},
+    iter::Peekable,
     path::PathBuf,
     slice::Iter,
 };
