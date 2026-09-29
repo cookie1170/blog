@@ -1,12 +1,12 @@
 # shader tutorial plan
 
-## part 1: what is a shader?
+## [x] part 1: what is a shader?
 
 a brief introduction on _what_ a shader is, why they're used (some cool pics!)
 
 i don't think the different types of shaders should be covered here - this is meant to be a very surface level overview
 
-## part 2: super basic fragment shaders
+## [] part 2: super basic fragment shaders
 
 ### what is a material?
 
@@ -30,7 +30,7 @@ assignment: make a shader that switches between two colours based on a uniform
 
 <!-- might be worth combining parts 2 and 3, and maybe even 1 -->
 
-## part 3: textures!
+## [] part 3: textures!
 
 ### uvs
 
@@ -47,7 +47,7 @@ which is usually used to decide where it should sample a texture from. these are
 then show textures, don't go into samplers too much, and how to sample textures (`textureSample`)
 hmm think of assignments here. dissolve shader would probably be too complex so far because it needs masking
 
-## part 4: 1 × 0 = 0: masking
+## [] part 4: 1 × 0 = 0: masking
 
 first explain alpha more, talk about alpha modes.
 then talk about masking, multiply alpha by 0 to hide the pixel
@@ -61,7 +61,7 @@ assignment: change the `step` edge using uniforms!
 
 [`step`]: https://webgpufundamentals.org/webgpu/lessons/webgpu-wgsl-function-reference.html#func-step
 
-## part 5: mix/lerp
+## [] part 5: mix/lerp
 
 talk about what [`mix`], aka lerp, does, first using just numbers, then colours.
 show that you can use [`bevy_sprite_render::mesh2d::view_bindings::globals.time`] to access the current time

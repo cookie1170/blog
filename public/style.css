@@ -14,7 +14,10 @@
 :root {
     font-family: "Mulish", sans-serif;
     accent-color: var(--accent);
-    clear: left;
+}
+
+* {
+    clear: both;
 }
 
 body {
@@ -201,7 +204,6 @@ span.footnote {
 input.footnote:checked + span.footnote {
     display: block;
     float: left;
-    clear: both;
     margin: 0.5rem 0;
     width: 100%;
 }
@@ -283,6 +285,8 @@ p {
 img,
 video {
     width: 60%;
+    border: var(--container-2) solid 2px;
+    border-radius: 0.25rem;
 }
 
 /* HACK: typst's svg output hardcodes colours as `fill="000000"`, etc */
