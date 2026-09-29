@@ -3,7 +3,7 @@ let lastHash;
 let reloadId = setInterval(reloadIfNeeded, 75);
 
 async function fetchHash() {
-  let hash = await (await fetch("hash.txt")).text();
+  let hash = await (await fetch("hash.txt", { cache: "no-cache" })).text();
   return hash;
 }
 
