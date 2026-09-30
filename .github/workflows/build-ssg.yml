@@ -2,6 +2,7 @@ name: build-ssg
 run-name: Build static site generator
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -22,30 +23,13 @@ jobs:
       - name: Build
         run: cargo build --release --target "$TARGET"
       - run: mv "target/$TARGET/release/blog" "blog-$TARGET"
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: blog-${{ env.TARGET }}
-          name: blog-${{ env.TARGET }}
-
-  upload:
-    runs-on: ubuntu-latest
-    needs: build
-    env:
-      TARGET: "x86_64-unknown-linux-gnu"
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v7
-        id: download
-        with:
-          name: blog-${{ env.TARGET }}
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload '${{ github.ref_name }}' "${{ steps.download.outputs.download-path }}/blog-$TARGET"
+        run: gh release upload '${{ github.ref_name }}' "blog-$TARGET"
 
   deploy:
-    needs: upload
+    needs: build
     permissions:
       contents: read
       pages: write
