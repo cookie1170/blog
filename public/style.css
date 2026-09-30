@@ -128,17 +128,31 @@ hr {
 /* elements */
 
 .head,
-blockquote {
+blockquote,
+.details-content {
     background-color: var(--container);
     border-left: var(--container-2) solid 0.5rem;
 }
-blockquote {
+
+blockquote,
+.details-content {
     padding: 0.25rem;
     padding-left: 0.5rem;
     margin-left: 1rem;
 }
 
-blockquote p {
+.details-content {
+    margin-top: 0.25rem;
+}
+
+blockquote p,
+blockquote h1,
+blockquote h2,
+blockquote h3,
+.details-content p,
+.details-content h1,
+.details-content h2,
+.details-content h3 {
     margin: 0.25rem 0;
 }
 
