@@ -15,27 +15,30 @@ but this usually isn't a very helpful definition, so let's dig a little deeper.
 
 The most common type of shader you'll hear about is a _fragment shader_.
 A fragment shader is a piece of code that runs for _every single pixel_
-that is rendered by a mesh to decide what colour it should be.
-(which is why they're also often called _pixel shaders_) That's a lot of pixels![^lot-of-pixels]
-Your CPU would likely struggle processing each of them 60 times a second!
+that is rendered by a mesh to decide what colour it should be
+(which is why they're also often called _pixel shaders_).
+
+On a 1920x1080 screen, there are over _2 million_ pixels! That's a lot of pixels!
+Your CPU would likely struggle processing each of them 60 times a second![^cpu-struggle]
 That's why we need the GPU -- the **G**raphics **P**rocessing **U**nit -- to run fragment shaders.
-GPUs have a _lot_ of cores,[^cores] which means they're able to run your code in parallel a lot better than the CPU.
+GPUs are designed to run code in parallel, so instead of each pixel being drawn one after another,
+large batches of pixels are drawn at the same time, which lets them run _much_ faster than if it was done on the CPU.
 
-Shader code isn't very different from CPU code, most concepts you've learnt
-(functions, conditionals, loops, etc.) will still be relevant for shaders.
+We usually hear about shaders in the context of fancy VFX -- think minecraft shaders --
+but they're actually the backbone of _all_ modern rendering, both 2D and 3D.
+Shaders are used to draw textures, sprites, make sure 3D geometry is positioned correctly on the screen,
+and to shade it based on lighting (hence the name *shade*r).
 
-[^lot-of-pixels]: On a 1920x1080 screen, there are over _2 million_ pixels!
+Even though it might seem intimidating, shader code isn't very different from CPU code.
+Most of the concepts you've learnt (functions, conditionals, loops, etc.) will still be relevant for shaders.
 
-[^cores]:
-    An RTX 2060, for example, has [nearly 2000 cores](https://www.nvidia.com/en-gb/geforce/graphics-cards/compare/?section=compare-20),
-    while a typical CPU has around 8-16 cores.
+[^cpu-struggle]:
+    CPU rendering is possible (typically called software rendering),
+    but it's usually a lot slower and only done for compatibility with old systems.
 
 # What can they do?
 
-All this theory is boring! Let's look at what you can do with shaders and where they're used!
-Shaders are very prevelant in most modern games, as they let you do some very fancy things.[^fancy-things]
-
-[^fancy-things]: Shaders are also used for _boring stuff_ like making sure 3D objects have correct perspective and lighting.
+All this theory is boring! Let's look at what you can do with shaders beyond simply drawing geometry.
 
 To start off, let's look at one of the simplest possible shaders: A hit flash
 
@@ -57,7 +60,7 @@ Let's take a look at a more complex effect: The Ultrahand from Tears of the King
 [^totk]: Footage used from Nintendo's ['Play around with Ultrahand'](https://www.youtube.com/watch?v=8xh2SgpLDv4)
 
 Here shaders are used for a subtle outline around the object, the green waves of "magic"
-coming out of the point where it's held, and the connection between Link's hand and the log.
+radiating from the point where it's held, and the connection between Link's hand and the log.
 
 Shaders are also often used for unique art styles, such as in Dead Cells -- that game is secretly 3D with a pixelation shader;
 outlines; shading effects, such as cel shading; and much more.
