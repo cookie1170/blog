@@ -555,7 +555,7 @@ pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Res
                 <article class="post-embed">
                     <header>
                         <a class="block-link" href="/blog/{slug}">
-                            <h1 class="title on-container">{title}</h1>
+                            <h1 class="title">{title}</h1>
                         </a>
                     </header>
                     <div class="tags">{tags}</div>
@@ -603,7 +603,7 @@ pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Res
                         <article class="post-embed">
                             <header>
                                 <a class="block-link" href="/blog/${{post.slug}}">
-                                    <h1 class="title on-container">${{post.title}}</h1>
+                                    <h1 class="title">${{post.title}}</h1>
                                 </a>
                             </header>
                             <div class="tags">${{tagsString}}</div>

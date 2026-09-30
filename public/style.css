@@ -3,9 +3,7 @@
     --bg: #252225;
     --on-bg: #e5e2dc;
     --container: #292529;
-    --on-container: #e3ded4;
     --container-2: #333033;
-    --on-container-2: #eee9e1;
     --muted: #757075;
     --accent: #f27e38;
     --on-accent: #292529;
@@ -54,7 +52,6 @@ body {
 .search-bar input {
     background-color: var(--container);
     border: var(--container-2) solid 1px;
-    color: var(--on-container);
     padding: 0.5rem;
     border-radius: 500px;
     height: 2rem;
@@ -133,7 +130,6 @@ hr {
 .head,
 blockquote {
     background-color: var(--container);
-    color: var(--on-container);
     border-left: var(--container-2) solid 0.5rem;
 }
 blockquote {
@@ -154,14 +150,12 @@ table {
 
 th {
     background-color: var(--container-2);
-    color: var(--on-container-2);
     padding: 0.2rem;
     outline: none;
 }
 
 td {
     background-color: var(--container);
-    color: var(--on-container);
     padding: 0.2rem;
     outline: none;
 }
@@ -217,7 +211,6 @@ code {
 
 code.inline-code {
     background-color: var(--container);
-    color: var(--on-container);
     padding: 0.125rem 0.25rem;
     border-radius: 0.25rem;
     border: var(--container-2) solid 1px;
@@ -229,7 +222,6 @@ code.inline-code {
     overflow-x: scroll;
     padding: 0.5rem;
     background-color: var(--container);
-    color: var(--on-container);
     border: var(--container-2) solid 1px;
 }
 
@@ -237,6 +229,10 @@ code.inline-code {
 
 p {
     max-width: 100%;
+}
+
+a {
+    color: var(--on-bg);
 }
 
 .a {
@@ -265,15 +261,10 @@ p {
 
 .task-marker {
     background-color: var(--container-2);
-    fill: var(--on-container-2);
     vertical-align: middle;
     margin: 0.125rem;
     margin-right: 0.25rem;
     border-radius: 0.25rem;
-}
-
-.on-container {
-    color: var(--on-container);
 }
 
 .center {
