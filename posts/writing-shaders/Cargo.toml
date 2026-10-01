@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = ["demos/*"]
+
+[workspace.dependencies]
+bevy = { version = "0.20.0-rc.2", default-features = false, features = ["2d", "dev", "dynamic_linking", "embedded_watcher"] }
+bevy_dev_tools = { version = "0.20.0-rc.2", features = ["screenrecording"] }

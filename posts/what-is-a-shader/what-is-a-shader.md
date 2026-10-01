@@ -26,7 +26,7 @@ large batches of pixels are drawn at the same time, which lets them run _much_ f
 
 We usually hear about shaders in the context of fancy VFX -- think minecraft shaders --
 but they're actually the backbone of _all_ modern rendering, both 2D and 3D.
-Shaders are used to draw textures, sprites, make sure 3D geometry is positioned correctly on the screen,
+Shaders are used to draw meshes, textures, sprites, make sure 3D geometry is positioned correctly on the screen,
 and to shade it based on lighting (hence the name *shade*r).
 
 Even though it might seem intimidating, shader code isn't very different from CPU code.
