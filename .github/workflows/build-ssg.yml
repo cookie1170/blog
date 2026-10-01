@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
+        with:
+          add-rust-environment-hash-key: false
       - name: Build
         run: cargo build --release --target "$TARGET"
       - run: mv "target/$TARGET/release/blog" "blog-$TARGET"
