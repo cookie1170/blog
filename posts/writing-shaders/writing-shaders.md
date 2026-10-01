@@ -70,9 +70,14 @@ First, let's define a struct, call it something like `MyMaterial`. Then we'll de
 struct MyMaterial { }
 ```
 
-I'll explain `AsBindGroup` later on, but the rest are pretty clear.
+The [`Asset`] derive lets the type be used as an asset, similar to how we use `Mesh` above, which the material system requires.
+For more information about assets, I recommend you read the [Assets] article over at Tainted Coders
 
-Next, we need to actually implement `Material2d`! For now, let's keep all the methods as their default implementation.
+I'll explain the `AsBindGroup` derive later on, don't worry about it for now.
+
+Next, we need to actually implement [`Material2d`]! The [`Material2d`] trait gives Bevy information
+about what shaders and other properties a material has. Most of its implementations don't actually do any logic --
+all the methods simply return constants. For now, let's use the default implementation for everything.
 
 ```rs
 impl Material2d for MyMaterial { }
@@ -88,7 +93,11 @@ app.add_plugins(Material2dPlugin::<MyMaterial>::default());
 Now, let's try replacing the `ColorMaterial` with our shiny new `MyMaterial`:
 
 ```rs
-fn setup(mut materials: ResMut<Assets<MyMaterial>>, mut meshes: ResMut<Assets<Mesh>>, mut commands: Commands) {
+fn setup(
+    mut materials: ResMut<Assets<MyMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut commands: Commands
+) {
     let shape = meshes.add(Rectangle::new(128.0, 128.0));
 
     commands.spawn((
@@ -109,6 +118,8 @@ which is a shader that simply always returns this colour.
 But we don't want a bright pink square in our game! So let's write a shader ourselves.
 
 [2D shapes]: https://bevy.org/examples/2d-rendering/2d-shapes/
+[`Asset`]: https://docs.rs/bevy/latest/bevy/asset/trait.Asset.html
+[Assets]: https://taintedcoders.com/bevy/assets
 [`Material`]: https://docs.rs/bevy/latest/bevy/pbr/trait.Material.html
 [`Material2d`]: https://docs.rs/bevy/latest/bevy/sprite_render/trait.Material2d.html
 [`ColorMaterial`]: https://docs.rs/bevy/latest/bevy/prelude/struct.ColorMaterial.html
@@ -171,10 +182,10 @@ A colour in a shader is represented by four numbers, each in the range from 0 to
 the red channel, the green channel, the blue channel, and the alpha channel (aka opacity), which form an RGBA colour.
 
 To group multiple numbers together, WGSL uses _vectors_, which, unlike `Vec` in Rust, are a fixed set of a small number of values.
-They're represented by the `vec<T>` type, which has a generic parameter. Since each colour channel ranges from 0 to 1,
+They're represented by the `vec2<T>` through `vec4<T>` types, which have a generic parameter. Since each colour channel ranges from 0 to 1,
 the type of each channel is `f32`, so a colour's type is `vec4<f32>`, which has a shorthand form `vec4f`.
 
-To construct a vector, use the `vec` function and pass to it 4 numbers, like `vec(1, 2, 3, 4)`.
+To construct a vector, we can use the `vec4` function and pass to it 4 numbers, like `vec4(1, 2, 3, 4)`.
 
 Now let's make our `fragment` function return a `vec4f` via `-> vec4f`:
 
@@ -205,9 +216,8 @@ The error message here isn't entirely clear -- what's a "binding"?
 To solve it, we need to understand that any return or parameter of an entry point
 must have specified _locations_ for each of its fields (which we only have one of).
 
-This ensures that the inputs and outputs of entry points are consistently interpreted by everything involved.
-
-For our output, we can use a location of `0` via the `@location` attribute:
+This ensures that the inputs and outputs of entry points are known by Bevy's renderer. In this case,
+it reads the colour from location 0, so that's what we'll use for our output via the `@location` attribute:
 
 ```wesl
 @fragment
