@@ -8,9 +8,9 @@ impl Material2d for MyMaterial {
 }
 
 fn spawn_scene(
-    mut cmd: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<MyMaterial>>,
+    mut cmd: Commands,
 ) {
     cmd.spawn(Camera2d);
 

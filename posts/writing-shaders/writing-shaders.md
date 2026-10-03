@@ -30,6 +30,14 @@ Now that we know what a shader is, how is it made? In this and following posts w
     </div>
 </details>
 
+> [!WARNING]
+> This tutorial is written for Bevy 0.20, which isn't yet released!
+> You can use the release candidate version instead:
+>
+> ```toml
+> bevy = "0.20.0-rc.2"
+> ```
+
 To apply a shader, you first need something to render! To start off, we'll be using 2D meshes
 because they're simpler than dealing with the third dimension right off the bat
 
@@ -404,8 +412,124 @@ Now let's have a look at some of [`VertexOutput`]'s fields:
 
 - `world_normal` -- The direction away from the mesh's surface at this point. For 2D, this is usually `0, 0, 1` for all pixels, but it matters in 3D.
 
+Now it's getting more exciting as our pixels can be different colours! But you know what's even more exciting?
+
 [`VertexOutput`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/mesh2d/vertex_output/struct.VertexOutput.html
 [`bevy_sprite_render`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/index.html
 [vertex-output-3d]: https://jannik4.github.io/wesldoc_bevy/bevy_pbr/latest/bevy_pbr/render/forward_io/struct.VertexOutput.html
 [`bevy_pbr`]: https://jannik4.github.io/wesldoc_bevy/bevy_pbr/latest/bevy_pbr/index.html
 [wesldoc]: https://jannik4.github.io/wesldoc_bevy/
+
+# Textures
+
+Besides uniforms, there's another type of binding -- a _texture_. A texture is like an image[^image] that we can use in our shader.
+
+[^image]: But textures don't have to be 2D! They can also be 1D or 3D.
+
+To make a texture binding, we need to use a `Handle<Image>` field in our Rust struct with a new attribute: `#[texture]` and `#[sampler]`.
+Both of these attributes take a binding index:
+
+```rs
+struct MyMaterial {
+    #[texture(0)]
+    #[sampler(1)]
+    texture: Handle<Image>,
+}
+```
+
+These binding indices must be different and they can't be part of our uniform struct,
+they have to be separate from the uniforms because they're a different kind of binding:
+
+```wesl
+@group(constants::MATERIAL_BIND_GROUP) @binding(0) var my_texture: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(1) var my_sampler: sampler;
+```
+
+The sampler decides how the texture is sampled. If you've ever heard of nearest/point and linear/bilinear filtering -- that's what the sampler decides.
+You can use textures without a sampler, but it's rare and often not advised to do that.
+
+To sample a texture in your shader, you can use the [`textureSample`] function, which takes 3 inputs: the texture, the sampler, and the UV.
+
+UV? What's that?
+
+## UVs
+
+A _UV coordinate_ is a 2D vector with its components ranging from 0 to 1.
+It's used to decide where a texture is sampled (read) from.
+
+UV `0, 0` would sample from the top left corner of the texture, UV `0.5, 0.5` would sample from the centre,
+while UV `1, 1` would sample from the bottom right corner.
+
+![0,0 in the top left corner; 1,0 in the top right corner;
+0,1 in the bottom left corner; 1,1 in the bottom right corner; 0.5, 0.5 in the centre](uv.png "UV coordinates")
+
+It's important to note that UVs are a position on a _texture_, not on a mesh.
+That is to say, UV `0.5, 0.5` will always correspond to the centre of a texture,
+but it might be anywhere on your mesh -- it's decided by the mesh author.
+
+---
+
+You can access the UV coordinates for your pixel from the [`VertexOutput`]'s `uv` field:
+
+```wesl
+fn fragment(in: VertexOutput) -> @location(0) vec4f {
+    return textureSample(my_texture, my_sampler, in.uv);
+}
+```
+
+Yay! Our square now has a texture!
+
+![A Minecraft grass block texture](textures.png "Texture")
+
+But if you try a different texture, you might run into a strange issue:
+
+![A texture with a white background instead of no background](broken-bevy.png "Wrong background")
+
+But the image itself had no background! Why is it white?
+
+The reason is the [_alpha mode_][`AlphaMode2d`], which decides how the renderer uses the pixel's alpha.
+The default alpha mode is [`AlphaMode2d::Opaque`], which tells the renderer to ignore the alpha completely.
+
+But we don't want that! Instead, we can use [`AlphaMode2d::Blend`][^blend],
+which makes the renderer blend the colour with what's behind it based on alpha, by overriding the [`Material2d::alpha_mode`] method
+
+[^blend]:
+    The astute reader may have noticed [`AlphaMode2d::Mask`]. If that's you, good job!
+    [`AlphaMode2d::Mask`] doesn't do much by itself -- it behaves the same as `Opaque` and leaves the alpha masking to the shader,
+    which can be implemented by using `discard;` on pixels with a small enough alpha. For brevity, I've chosen to use `Blend` instead.
+
+![A Bevy bird with a correctly transparent](alpha-mode.png "Fixed alpha mode")
+
+Hooray!
+
+> ## Exercise
+>
+> Play around with it! Try swapping textures, manipulating the UVs or tinting them!
+>
+> Recreate the hit flash shader from the first post but using a texture this time!
+
+> [!NOTE]
+>
+> If you've used Bevy in 2D before, you've likely used [`Sprite`] rather than `Mesh2d`.
+>
+> Fortunately, materials can also be used with [`Sprite`], [PRed by yours truly](https://github.com/bevyengine/bevy/pull/25415)!
+>
+> Instead of implementing the `Material2d` trait, you need to implement [`MaterialExtension2d`]
+> and instead of `MeshMaterial2d`, you need to use [`SpriteMaterial`].
+>
+> For sprite material shaders, instead of sampling textures using `textureSample`, you can import utilities from
+> [`bevy_sprite_render::sprite_mesh::functions`], such as [`sample_sprite_texture`].
+>
+> Make sure to call [`get_final_color`] at the end to apply tint and discard pixels based on the alpha (when the `alpha_mode` is [`Mask`][`AlphaMode2d::Mask`])!
+
+[`AlphaMode2d`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html
+[`AlphaMode2d::Opaque`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Opaque
+[`AlphaMode2d::Blend`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Blend
+[`AlphaMode2d::Mask`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Mask
+[`Material2d::alpha_mode`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/sprite_render/trait.Material2d.html#method.alpha_mode
+[`sample_sprite_texture`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/fn.sample_sprite_texture.html
+[`get_final_color`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/fn.get_final_color.html
+[`bevy_sprite_render::sprite_mesh::functions`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/index.html
+[`MaterialExtension2d`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/trait.MaterialExtension2d.html
+[`SpriteMaterial`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/struct.SpriteMaterial.html
+[`Sprite`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/struct.Sprite.html

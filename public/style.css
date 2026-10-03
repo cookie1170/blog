@@ -155,6 +155,14 @@ blockquote,
     margin-top: 0.25rem;
 }
 
+blockquote :first-child {
+    margin-top: 0;
+}
+
+blockquote :last-child {
+    margin-bottom: 0;
+}
+
 blockquote p,
 blockquote h1,
 blockquote h2,
@@ -163,7 +171,7 @@ blockquote h3,
 .details-content h1,
 .details-content h2,
 .details-content h3 {
-    margin: 0.25rem 0;
+    margin: 0.75rem 0;
 }
 
 /* table */
