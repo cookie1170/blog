@@ -24,6 +24,10 @@ That's why we need the GPU -- the **G**raphics **P**rocessing **U**nit -- to run
 GPUs are designed to run code in parallel, so instead of each pixel being drawn one after another,
 large batches of pixels are drawn at the same time, which lets them run _much_ faster than if it was done on the CPU.
 
+[^cpu-struggle]:
+    CPU rendering is possible (typically called software rendering),
+    but it's usually a lot slower and only done for compatibility with old systems.
+
 We usually hear about shaders in the context of fancy VFX -- think minecraft shaders --
 but they're actually the backbone of _all_ modern rendering, both 2D and 3D.
 Shaders are used to draw meshes, textures, sprites, make sure 3D geometry is positioned correctly on the screen,
@@ -31,10 +35,6 @@ and to shade it based on lighting (hence the name *shade*r).
 
 Even though it might seem intimidating, shader code isn't very different from CPU code.
 Most of the concepts you've learnt (functions, conditionals, loops, etc.) will still be relevant for shaders.
-
-[^cpu-struggle]:
-    CPU rendering is possible (typically called software rendering),
-    but it's usually a lot slower and only done for compatibility with old systems.
 
 # What can they do?
 

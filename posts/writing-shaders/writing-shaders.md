@@ -130,7 +130,8 @@ But we don't want a bright pink square in our game! So let's write a shader ours
 Finally we get to the "writing shaders" part of "writing shaders"!
 
 Shaders in Bevy are written in a language called [WESL](https://wesl-lang.dev/),
-which is an extension of another language, called WGSL, introducing modules and imports.
+which is an extension of another language, called WGSL, introducing modules and imports, which we'll use later.
+For the rest of the post, I'll be using the term WESL, but most things mentioned also apply to plain WGSL.
 
 Let's create a WESL file, like `shader.wesl`, and put it in our project's `assets/` directory.
 
@@ -181,7 +182,7 @@ To change that, we need to make the fragment shader return something.. But what?
 A colour in a shader is represented by four numbers, each in the range from 0 to 1:
 the red channel, the green channel, the blue channel, and the alpha channel (aka opacity), which form an RGBA colour.
 
-To group multiple numbers together, WGSL uses _vectors_, which, unlike `Vec` in Rust, are a fixed set of a small number of values.
+To group multiple numbers together, WESL uses _vectors_, which, unlike `Vec` in Rust, are a fixed set of a small number of values.
 They're represented by the `vec2<T>` through `vec4<T>` types, which have a generic parameter. Since each colour channel ranges from 0 to 1,
 the type of each channel is `f32`, so a colour's type is `vec4<f32>`, which has a shorthand form `vec4f`.
 
@@ -348,9 +349,63 @@ Now, if we change the value of `some_uniform` on the material asset, the colour 
 > Make a hit flash shader -- just like the one we looked at in the first post --
 > which takes in 2 colours and selects one of them based on whether a `u32` value is 0 or not!
 
+Sadly, though, plain colours still aren't very interesting for our players.
+
+Currently, every pixel in our shader runs the same exact logic with the exact same data,
+so no matter what we try to do, it will always return the same colour.
+
+But, as with bindings, there's a solution to that!
+
 [`AsBindGroup`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.AsBindGroup.html
 [`ShaderType`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.ShaderType.html
 [`LinearRgba`]: https://docs.rs/bevy/latest/bevy/color/struct.LinearRgba.html
 [`Color`]: https://docs.rs/bevy/latest/bevy/color/enum.Color.html
 [`unpack4xU8`]: https://gpuweb.github.io/gpuweb/wgsl/#unpack4xU8-builtin
 [`u32::to_ne_bytes`]: https://doc.rust-lang.org/stable/std/primitive.u32.html#method.to_ne_bytes
+
+# Fragment inputs
+
+So far, our fragment shader's signature has been `fn fragment() -> vec4f`.
+Since the fragment shader is pure, this means that each pixel is the same as any other.
+
+But that doesn't have to be the case! We can change our fragment shader's signature to accept some data.
+Since we're using a `Mesh2d`, we can use a parameter[^param] of type [`VertexOutput`] from [`bevy_sprite_render`].
+For `Mesh3d`, you'd use the [`VertexOutput`][vertex-output-3d] from [`bevy_pbr`].
+The name `VertexOutput` comes from the fact that this struct is what the vertex shader outputs, which is another type of shader I'll cover later.
+
+[^param]:
+    If you remember, earlier I've mentioned that every parameter must have a `@location`.
+    This is still the case! If you look at [`VertexOutput`]'s documentation, you can see that each of its fields has `@location` (or another attribute) specified!
+
+This is where WESL's imports come in!
+We can import the type using the `import` keyword followed by the path:
+
+```wesl
+import bevy_sprite_render::mesh2d::vertex_output::VertexOutput;
+```
+
+> [!TIP]
+> You can see documentation for all WESL items that bevy exports using [wesldoc]!
+
+And then use it as our fragment shader's parameter:
+
+```wesl
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4f {
+    // …
+}
+```
+
+Now let's have a look at some of [`VertexOutput`]'s fields:
+
+- `position` -- The position of this pixel on the screen, where `0, 0` is the top left corner and `width, height` is the bottom right corner.
+
+- `world_position` -- The position of this pixel in the world -- this will change depending on where your mesh is positioned.
+
+- `world_normal` -- The direction away from the mesh's surface at this point. For 2D, this is usually `0, 0, 1` for all pixels, but it matters in 3D.
+
+[`VertexOutput`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/mesh2d/vertex_output/struct.VertexOutput.html
+[`bevy_sprite_render`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/index.html
+[vertex-output-3d]: https://jannik4.github.io/wesldoc_bevy/bevy_pbr/latest/bevy_pbr/render/forward_io/struct.VertexOutput.html
+[`bevy_pbr`]: https://jannik4.github.io/wesldoc_bevy/bevy_pbr/latest/bevy_pbr/index.html
+[wesldoc]: https://jannik4.github.io/wesldoc_bevy/
