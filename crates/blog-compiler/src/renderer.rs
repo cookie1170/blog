@@ -37,6 +37,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 <div class="tags">{tags}</div>
                 <p class="date">{date}</h1>
             </header>
+            {prev}
             <hr class="section-split" />
         "#,
             title = self.meta.title,
@@ -52,40 +53,35 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 } else {
                     Ok(())
                 }
+            }),
+            prev = fmt::from_fn(|f| {
+                if let Some(ref prev) = self.meta.prev {
+                    let Some(prev_post) = self.metas.iter().find(|p| p.slug == *prev) else {
+                        return Err(fmt::Error);
+                    };
+
+                    write!(
+                        f,
+                        r#"
+                <div class="prev">
+                    <a class="a" href="{PREFIX}/{prev}">
+                        <svg height="16px" width="16px">
+                            <use href="{PREFIX}/public/left.svg#left">
+                        </svg>
+                        {prev_title}
+                    </a>
+                </div>
+                        "#,
+                        prev_title = prev_post.title,
+                    )?;
+                }
+                Ok(())
             })
         ))?;
         Ok(())
     }
 
     pub fn write_ending_html(&mut self) -> Result<()> {
-        if self.meta.prev.is_some() || self.meta.next.is_some() {
-            self.write(
-                r#"
-        <hr class="section-split" />
-                "#,
-            )?;
-        }
-
-        if let Some(ref prev) = self.meta.prev {
-            let Some(prev_post) = self.metas.iter().find(|p| p.slug == *prev) else {
-                bail!("previous post '{prev}' not found");
-            };
-
-            self.write_fmt(format_args!(
-                r#"
-        <div class="prev">
-            <a class="a" href="{PREFIX}/{prev}">
-                <svg height="16px" width="16px">
-                    <use href="{PREFIX}/public/left.svg#left">
-                </svg>
-                {prev_title}
-            </a>
-        </div>
-                "#,
-                prev_title = prev_post.title,
-            ))?;
-        }
-
         if let Some(ref next) = self.meta.next {
             let Some(next_post) = self.metas.iter().find(|p| p.slug == *next) else {
                 bail!("next post '{next}' not found");
@@ -93,6 +89,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
 
             self.write_fmt(format_args!(
                 r#"
+        <hr class="section-split" />
         <div class="next">
             <a class="a" href="{PREFIX}/{next}">
                  {next_title}
