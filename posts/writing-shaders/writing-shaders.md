@@ -357,12 +357,7 @@ Now, if we change the value of `some_uniform` on the material asset, the colour 
 > Make a hit flash shader -- just like the one we looked at in the first post --
 > which takes in 2 colours and selects one of them based on whether a `u32` value is 0 or not!
 
-Sadly, though, plain colours still aren't very interesting for our players.
-
-Currently, every pixel in our shader runs the same exact logic with the exact same data,
-so no matter what we try to do, it will always return the same colour.
-
-But, as with bindings, there's a solution to that!
+Sadly, though, plain colours still aren't very interesting for our players, so let's change that!
 
 [`AsBindGroup`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.AsBindGroup.html
 [`ShaderType`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.ShaderType.html
@@ -385,8 +380,7 @@ The name `VertexOutput` comes from the fact that this struct is what the vertex 
     If you remember, earlier I've mentioned that every parameter must have a `@location`.
     This is still the case! If you look at [`VertexOutput`]'s documentation, you can see that each of its fields has `@location` (or another attribute) specified!
 
-This is where WESL's imports come in!
-We can import the type using the `import` keyword followed by the path:
+This is where WESL's imports come in! We can use the `import` keyword to use the type:
 
 ```wesl
 import bevy_sprite_render::mesh2d::vertex_output::VertexOutput;
@@ -424,9 +418,9 @@ Now it's getting more exciting as our pixels can be different colours! But you k
 
 Besides uniforms, there's another type of binding -- a _texture_. A texture is like an image[^image] that we can use in our shader.
 
-[^image]: But textures don't have to be 2D! They can also be 1D or 3D.
+[^image]: But textures don't have to be 2D, They can also be 1D or 3D!
 
-To make a texture binding, we need to use a `Handle<Image>` field in our Rust struct with a new attribute: `#[texture]` and `#[sampler]`.
+To make a texture binding, we need to use a `Handle<Image>` field in our Rust struct with some new attributes: `#[texture]` and `#[sampler]`.
 Both of these attributes take a binding index:
 
 ```rs
@@ -437,7 +431,7 @@ struct MyMaterial {
 }
 ```
 
-These binding indices must be different and they can't be part of our uniform struct,
+These binding indices must be different and they can't be part of our uniform struct --
 they have to be separate from the uniforms because they're a different kind of binding:
 
 ```wesl
@@ -448,14 +442,16 @@ they have to be separate from the uniforms because they're a different kind of b
 The sampler decides how the texture is sampled. If you've ever heard of nearest/point and linear/bilinear filtering -- that's what the sampler decides.
 You can use textures without a sampler, but it's rare and often not advised to do that.
 
-To sample a texture in your shader, you can use the [`textureSample`] function, which takes 3 inputs: the texture, the sampler, and the UV.
+To sample (read from) a texture in your shader, you can use the [`textureSample`] function, which takes 3 inputs: the texture, the sampler, and the UV.
 
 UV? What's that?
+
+[`textureSample`]: https://webgpufundamentals.org/webgpu/lessons/webgpu-wgsl-function-reference.html#func-textureSample
 
 ## UVs
 
 A _UV coordinate_ is a 2D vector with its components ranging from 0 to 1.
-It's used to decide where a texture is sampled (read) from.
+It's used to decide what point a texture is sampled from.
 
 UV `0, 0` would sample from the top left corner of the texture, UV `0.5, 0.5` would sample from the centre,
 while UV `1, 1` would sample from the bottom right corner.
@@ -512,7 +508,7 @@ Hooray!
 >
 > If you've used Bevy in 2D before, you've likely used [`Sprite`] rather than `Mesh2d`.
 >
-> Fortunately, materials can also be used with [`Sprite`], [PRed by yours truly](https://github.com/bevyengine/bevy/pull/25415)!
+> Fortunately, materials can also be used with sprites, [PRed by yours truly](https://github.com/bevyengine/bevy/pull/25415)!
 >
 > Instead of implementing the `Material2d` trait, you need to implement [`MaterialExtension2d`]
 > and instead of `MeshMaterial2d`, you need to use [`SpriteMaterial`].

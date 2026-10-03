@@ -28,49 +28,62 @@ fn spawn_scene(
         })),
     ));
 
-    const HORIZONTAL: f32 = 192.0;
-    const VERTICAL: f32 = 232.0;
+    const DIST: f32 = 192.0;
+    const TEXT_OFFSET: Vec2 = vec2(40.0, 56.0);
     const SIZE: f32 = 64.0;
 
+    fn text(text: &'static str, dir: Vec2) -> impl Scene {
+        bsn! {
+            Transform
+            InheritedVisibility
+            Children [
+                Mesh2d(asset_value(Circle::new(16.0)))
+                MeshMaterial2d<ColorMaterial>(asset_value(Color::WHITE))
+                Transform {
+                    translation: vec3(0.0, 0.0, 1.0)
+                }
+                Children [
+                    Mesh2d(asset_value(Circle::new(16.0)))
+                    MeshMaterial2d<ColorMaterial>(asset_value(Color::BLACK))
+                    Transform {
+                        translation: vec3(4.0, -4.0, -0.5)
+                    }
+                ]
+                --
+                Text2d(text)
+                TextFont {
+                    font_size: FontSize::Px(SIZE)
+                }
+                Transform {
+                    translation: {(TEXT_OFFSET * dir).extend(0.0)}
+                }
+                Text2dShadow
+            ]
+        }
+    }
+
     cmd.spawn_scene_list(bsn_list! {
-        Text2d("0,0")
-        TextFont {
-            font_size: FontSize::Px(SIZE)
-        }
         Transform {
-            translation: vec3(-HORIZONTAL, VERTICAL, 0.0),
+            translation: vec3(-DIST, DIST, 0.0),
         }
+        @text("0,0", vec2(-1.0, 1.0))
         --
-        Text2d("1,1")
         Transform {
-            translation: vec3(HORIZONTAL, -VERTICAL, 0.0),
+            translation: vec3(DIST, -DIST, 0.0),
         }
-        TextFont {
-            font_size: FontSize::Px(SIZE)
-        }
+        @text("1,1", vec2(1.0, -1.0))
         --
-        Text2d("0,1")
         Transform {
-            translation: vec3(-HORIZONTAL, -VERTICAL, 0.0),
+            translation: vec3(-DIST, -DIST, 0.0),
         }
-        TextFont {
-            font_size: FontSize::Px(SIZE)
-        }
-        TextFont {
-            font_size: FontSize::Px(SIZE)
-        }        --
-        Text2d("1,0")
-        Transform {
-            translation: vec3(HORIZONTAL, VERTICAL, 0.0),
-        }
-        TextFont {
-            font_size: FontSize::Px(SIZE)
-        }
+        @text("0,1", vec2(-1.0, -1.0))
         --
-        Text2d("0.5,0.5")
-        TextFont {
-            font_size: FontSize::Px(SIZE)
+        Transform {
+            translation: vec3(DIST, DIST, 0.0),
         }
+        @text("1,0", vec2(1.0, 1.0))
+        --
+        @text("0.5,0.5", vec2(0.0, 1.25))
     });
 }
 
@@ -96,5 +109,6 @@ use bevy::{
     prelude::*,
     render::render_resource::AsBindGroup,
     shader::ShaderRef,
+    sprite::Text2dShadow,
     sprite_render::{Material2d, Material2dPlugin},
 };
