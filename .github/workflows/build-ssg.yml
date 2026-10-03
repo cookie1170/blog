@@ -3,7 +3,8 @@ run-name: Build static site generator
 
 on:
   push:
-    tags: [v*]
+    tags:
+      - v**
 
 env:
   CARGO_TERM_COLOR: always

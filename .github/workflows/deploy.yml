@@ -4,7 +4,6 @@ run-name: Deploy site
 on:
   push:
     branches: [main]
-    tags-ignore: [v*]
 
   workflow_dispatch:
   workflow_call:
