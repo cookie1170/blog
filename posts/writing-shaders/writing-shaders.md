@@ -36,7 +36,7 @@ because they're simpler than dealing with the third dimension right off the bat
 Let's take a look at the [2D shapes] example:
 
 ```rs
-// simplified for brevity
+// Simplified for brevity
 let shape = meshes.add(Rectangle::new(128.0, 128.0));
 
 commands.spawn((
@@ -45,7 +45,7 @@ commands.spawn((
 ));
 ```
 
-!["A white square on a grey background"](basic-mesh.png "Square")
+![A white square on a grey background](basic-mesh.png "Square")
 
 If you've seen the example before, you might have wondered about the `MeshMaterial2d(materials.add(Color::WHITE))` line.
 If you exclude it, nothing gets rendered, so it's clearly important. But _what_ is it doing?
@@ -237,4 +237,120 @@ Woo! We've succesfully rendered a square! Its colour is pure white, because an R
 >
 > Try to make the square green, blue, or yellow!
 
-[`embedded_asset!`]: https://docs.rs/bevy/latest/bevy/asset/macro.embedded_asset.html
+But no matter how exciting a white square is to us, it's not very exciting to the players of our game.
+So let's make something more interesting!
+
+Currently one of the biggest issues with our shader is that we can't control it from our Rust code -- it always just returns white.
+If we wanted to, say, change the colour based on what position the player is at, we would have to make a different shader for every colour!
+
+But, thankfully, there's a solution!
+
+# Bindings
+
+_Bindings_ are a way to control the shader from our Rust code. More precisely, they're a way to pass data from Rust to the shader.
+The [`AsBindGroup`] derive that I glossed over earlier is what lets us specify bindings.
+
+The simplest type of binding is a _uniform_, which is just a plain value passed to our shader.
+We can add new uniforms by simply adding a field to our material struct and decorating it with the `#[uniform]` attribute.
+The attribute expects a _binding index_ for the uniform, let's start at 0:
+
+```rs
+#[derive(AsBindGroup, …)]
+struct MyMaterial {
+    #[uniform(0)]
+    some_uniform: LinearRgba,
+}
+```
+
+The types of the fields are expected to implement [`ShaderType`],
+which includes types such as `f32`, `i32`, `u32`, `LinearRgba`, all the `VecN` and `MatN` types.
+
+Notably it does _not_ include types like `bool`, `u8`, etc. -- those will have to be packed into types like `u32`,
+for which you can use [`u32::to_ne_bytes`] in Rust and [`unpack4xU8`] in WESL.
+
+Colour fields should use the [`LinearRgba`] type, which [`Color`] can be converted into.
+
+If you want multiple fields of your struct to be passed to the shader, you should use `#[uniform]` on all of them with the same index.
+They will be combined into one uniform, which can be used in WESL with a struct:
+
+```wesl
+struct MyMaterial {
+    some_uniform: vec4f,
+}
+```
+
+The fields in WESL should be in the same order as in Rust.
+
+> [!WARNING]
+> If you want your game to work on WebGL, the struct's size in bytes must be a multiple of 16.
+> It's common to achieve this by including padding `u32` fields under `#[cfg(target_arch = "wasm32")]`, such as:
+>
+> ```rs
+> struct MyMaterial {
+>     // This only has a size of 8 bytes!
+>     #[uniform(0)]
+>     some_uniform: Vec2,
+>     // Pad it to 12 bytes in size
+>     #[uniform(0)]
+>     #[cfg(target_arch = "wasm32")]
+>     _padding_12b: u32,
+>     // Pad it to 16 bytes in size, we're all good!
+>     #[uniform(0)]
+>     #[cfg(target_arch = "wasm32")]
+>     _padding_16b: u32,
+> }
+> ```
+>
+> In WESL, the padding fields should have the `@if(SIXTEEN_BYTE_ALIGNMENT)` attribute:
+>
+> ```wesl
+> struct MyMaterial {
+>     some_uniform: Vec2,
+>     @if(SIXTEEN_BYTE_ALIGNMENT)
+>     _padding_12b: u32,
+>     @if(SIXTEEN_BYTE_ALIGNMENT)
+>     _padding_16b: u32,
+> }
+> ```
+>
+> This isn't needed when using WebGPU.
+
+Now we need to declare a top-level uniform variable in WESL to hold this struct:
+
+```wesl
+@group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> mat: MyMaterial;
+```
+
+The uniform has two attributes:
+
+- `@group(constants::MATERIAL_BIND_GROUP)` -- this tells WESL that our uniform
+  comes from the material's _bind group_ -- a set of multiple bindings.
+
+- `@binding(0)` -- this tells WESL what binding index our uniform is at.
+
+Now, our shader code can use it as usual:
+
+```wesl
+@fragment
+fn fragment() -> @location(0) vec4f {
+    return mat.some_uniform;
+}
+```
+
+Now, if we change the value of `some_uniform` on the material asset, the colour the shader outputs will change as well!
+
+![A square changing colour based on a colour input](uniforms.webm "Uniforms")
+
+> ## Exercise
+>
+> Do some interesting stuff!
+>
+> Make a hit flash shader -- just like the one we looked at in the first post --
+> which takes in 2 colours and selects one of them based on whether a `u32` value is 0 or not!
+
+[`AsBindGroup`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.AsBindGroup.html
+[`ShaderType`]: https://docs.rs/bevy/latest/bevy/render/render_resource/trait.ShaderType.html
+[`LinearRgba`]: https://docs.rs/bevy/latest/bevy/color/struct.LinearRgba.html
+[`Color`]: https://docs.rs/bevy/latest/bevy/color/enum.Color.html
+[`unpack4xU8`]: https://gpuweb.github.io/gpuweb/wgsl/#unpack4xU8-builtin
+[`u32::to_ne_bytes`]: https://doc.rust-lang.org/stable/std/primitive.u32.html#method.to_ne_bytes
