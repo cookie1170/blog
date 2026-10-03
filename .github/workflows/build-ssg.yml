@@ -3,8 +3,9 @@ run-name: Build static site generator
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags: [v*]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -25,10 +26,10 @@ jobs:
       - name: Build
         run: cargo build --release --target "$TARGET"
       - run: mv "target/$TARGET/release/blog" "blog-$TARGET"
-      - name: Upload
+      - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload '${{ github.ref_name }}' "blog-$TARGET"
+        run: gh release create '${{ github.ref_name }}' --notes-from-tag "blog-$TARGET"
 
   deploy:
     needs: build
