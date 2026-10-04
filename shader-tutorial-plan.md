@@ -6,7 +6,7 @@ a brief introduction on _what_ a shader is, why they're used (some cool pics!)
 
 i don't think the different types of shaders should be covered here - this is meant to be a very surface level overview
 
-## [] part 2: super basic fragment shaders
+## [x] part 2: super basic fragment shaders
 
 ### what is a material?
 
@@ -30,7 +30,7 @@ assignment: make a shader that switches between two colours based on a uniform
 
 <!-- might be worth combining parts 2 and 3, and maybe even 1 -->
 
-## [] part 3: textures!
+## [x] part 3: textures!
 
 ### uvs
 
