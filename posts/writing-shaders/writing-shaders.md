@@ -53,7 +53,7 @@ commands.spawn((
 ));
 ```
 
-![A white square on a grey background](basic-mesh.png "Square")
+![A white square on a grey background](basic-mesh.webp "Square")
 
 If you've seen the example before, you might have wondered about the `MeshMaterial2d(materials.add(Color::WHITE))` line.
 If you exclude it, nothing gets rendered, so it's clearly important. But _what_ is it doing?
@@ -115,7 +115,7 @@ fn setup(
 }
 ```
 
-![A solid fuchsia coloured square](empty-material.png "Empty material")
+![A solid fuchsia coloured square](empty-material.webp "Empty material")
 
 You might expect to see nothing being rendered -- we haven't provided a shader after all --
 but what actually happens is that the square is a solid fuchsia (bright pink) colour.
@@ -182,7 +182,7 @@ As we can see, functions in wesl are declared similarly to Rust -- using the `fn
 
 Now let's run the app.. and hooray! It launches!
 
-![An empty window](empty-fragment.png "Empty fragment shader")
+![An empty window](empty-fragment.webp "Empty fragment shader")
 
 But our mesh is currently invisible. That's because our fragment shader doesn't tell the pixel what colour it should be!
 To change that, we need to make the fragment shader return something.. But what?
@@ -236,7 +236,7 @@ fn fragment() -> @location(0) vec4f {
 }
 ```
 
-![A white square](basic-shader.png "Basic shader")
+![A white square](basic-shader.webp "Basic shader")
 
 Woo! We've succesfully rendered a square! Its colour is pure white, because an RGBA value of 1 on every channel is white.
 
@@ -457,7 +457,7 @@ UV `0, 0` would sample from the top left corner of the texture, UV `0.5, 0.5` wo
 while UV `1, 1` would sample from the bottom right corner.
 
 ![0,0 in the top left corner; 1,0 in the top right corner;
-0,1 in the bottom left corner; 1,1 in the bottom right corner; 0.5, 0.5 in the centre](uv.png "UV coordinates")
+0,1 in the bottom left corner; 1,1 in the bottom right corner; 0.5, 0.5 in the centre](uv.webp "UV coordinates")
 
 It's important to note that UVs are a position on a _texture_, not on a mesh.
 That is to say, UV `0.5, 0.5` will always correspond to the centre of a texture,
@@ -475,11 +475,11 @@ fn fragment(in: VertexOutput) -> @location(0) vec4f {
 
 Yay! Our square now has a texture!
 
-![A Minecraft grass block texture](textures.png "Texture")
+![A Minecraft grass block texture](textures.webp "Texture")
 
 But if you try a different texture, you might run into a strange issue:
 
-![A texture with a white background instead of no background](broken-bevy.png "Wrong background")
+![A texture with a white background instead of no background](broken-bevy.webp "Wrong background")
 
 But the image itself had no background! Why is it white?
 
@@ -494,7 +494,7 @@ which makes the renderer blend the colour with what's behind it based on alpha, 
     [`AlphaMode2d::Mask`] doesn't do much by itself -- it behaves the same as `Opaque` and leaves the alpha masking to the shader,
     which can be implemented by using `discard;` on pixels with a small enough alpha. For brevity, I've chosen to use `Blend` instead.
 
-![A Bevy bird with a correctly transparent](alpha-mode.png "Fixed alpha mode")
+![A Bevy bird with a correctly transparent](alpha-mode.webp "Fixed alpha mode")
 
 Hooray!
 
