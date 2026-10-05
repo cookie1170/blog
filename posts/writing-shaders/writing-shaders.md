@@ -5,7 +5,7 @@ tags = ["Tutorial", "Shaders", "Bevy", "Gamedev"]
 prev = "what-is-a-shader"
 +++
 
-Now that we know what a shader is, how is it made? In this and following posts we'll be using
+Now that we [know what a shader is](/what-is-a-shader), how is it made? In this and following posts we'll be using
 [Bevy](https://bevy.org/) as our engine of choice, so the tutorial assumes some prior knowledge.
 
 <!-- ugh i really gotta make a custom syntax for <details> -->
@@ -31,7 +31,7 @@ Now that we know what a shader is, how is it made? In this and following posts w
 </details>
 
 > [!WARNING]
-> This tutorial is written for Bevy 0.20, which isn't yet released!
+> This tutorial is written for **Bevy 0.20**, which isn't yet released!
 > You can use the release candidate version instead:
 >
 > ```toml
@@ -225,8 +225,8 @@ The error message here isn't entirely clear -- what's a "binding"?
 To solve it, we need to understand that any return or parameter of an entry point
 must have specified _locations_ for each of its fields (which we only have one of).
 
-This ensures that the inputs and outputs of entry points are known by Bevy's renderer. In this case,
-it reads the colour from location 0, so that's what we'll use for our output via the `@location` attribute:
+This ensures that the inputs and outputs of entry points are known by Bevy's renderer.
+It reads the output colour from location 0, so that's what we'll use for our output via the `@location` attribute:
 
 ```wesl
 @fragment
@@ -275,7 +275,7 @@ The types of the fields are expected to implement [`ShaderType`],
 which includes types such as `f32`, `i32`, `u32`, `LinearRgba`, all the `VecN` and `MatN` types.
 
 Notably it does _not_ include types like `bool`, `u8`, etc. -- those will have to be packed into types like `u32`,
-for which you can use [`u32::to_ne_bytes`] in Rust and [`unpack4xU8`] in WESL.
+for which you can use [`u32::from_ne_bytes`] in Rust and [`unpack4xU8`] in WESL.
 
 Colour fields should use the [`LinearRgba`] type, which [`Color`] can be converted into.
 
@@ -364,7 +364,7 @@ Sadly, though, plain colours still aren't very interesting for our players, so l
 [`LinearRgba`]: https://docs.rs/bevy/latest/bevy/color/struct.LinearRgba.html
 [`Color`]: https://docs.rs/bevy/latest/bevy/color/enum.Color.html
 [`unpack4xU8`]: https://gpuweb.github.io/gpuweb/wgsl/#unpack4xU8-builtin
-[`u32::to_ne_bytes`]: https://doc.rust-lang.org/stable/std/primitive.u32.html#method.to_ne_bytes
+[`u32::from_ne_bytes`]: https://doc.rust-lang.org/stable/std/primitive.u32.html#method.from_ne_bytes
 
 # Fragment inputs
 
@@ -446,7 +446,7 @@ To sample (read from) a texture in your shader, you can use the [`textureSample`
 
 UV? What's that?
 
-[`textureSample`]: https://webgpufundamentals.org/webgpu/lessons/webgpu-wgsl-function-reference.html#func-textureSample
+[`textureSample`]: https://www.w3.org/TR/WGSL/#texturesample
 
 ## UVs
 
