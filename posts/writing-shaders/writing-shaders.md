@@ -178,7 +178,7 @@ fn fragment() {
 }
 ```
 
-As we can see, functions in wesl are declared similarly to Rust -- using the `fn` keyword. But attributes use `@` instead of `#[]`.
+As we can see, functions in WESL are declared similarly to Rust -- using the `fn` keyword. But attributes use `@` instead of `#[]`.
 
 Now let's run the app.. and hooray! It launches!
 
