@@ -1,5 +1,6 @@
 #![feature(associated_type_defaults)]
 
+mod graph;
 mod parser;
 pub mod processor;
 mod renderer;

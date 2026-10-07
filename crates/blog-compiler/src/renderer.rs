@@ -164,8 +164,17 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                     })
                 ))?;
             }
-            E::MetadataBlock(meta) => {
-                tracing::info!("found meta:\n{meta}");
+            E::Graph(graph) => {
+                self.write_fmt(format_args!(
+                    r#"
+                    <p class="graph">
+                        {}
+                    </p>
+                    "#,
+                    graph
+                        .graph()
+                        .with_context(|| format!("failed to graph '{}'", graph.expr))?,
+                ))?;
             }
         }
 
@@ -437,7 +446,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 }
                 Event::TaskListMarker(true) => self.write("[x]")?,
                 Event::TaskListMarker(false) => self.write("[ ]")?,
-                Event::MetadataBlock(meta) => self.write_fmt(format_args!("+++\n{meta}\n+++"))?,
+                Event::Graph(graph) => self.write_fmt(format_args!("{}", graph.expr))?,
             }
         }
         Ok(())

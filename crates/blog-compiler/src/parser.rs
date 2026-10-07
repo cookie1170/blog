@@ -163,7 +163,7 @@ impl<'i> ParserInner<'i> {
     fn process_event(&mut self, event: CE<'i>) -> Result<()> {
         match event {
             CE::Start(tag) => self.start_tag(tag),
-            CE::End(tag_end) => self.end_tag(tag_end),
+            CE::End(tag_end) => self.end_tag(tag_end)?,
             CE::Text(text) => {
                 if self.in_metadata_block {
                     self.current_metadata_block.push_str(&text);
@@ -302,7 +302,7 @@ impl<'i> ParserInner<'i> {
         }
     }
 
-    fn end_tag(&mut self, tag: CTagEnd) {
+    fn end_tag(&mut self, tag: CTagEnd) -> Result<()> {
         match tag {
             CTagEnd::Paragraph => {
                 if self.is_footnote() {
@@ -343,8 +343,17 @@ impl<'i> ParserInner<'i> {
             CTagEnd::Link => self.events().push(Event::End(TagEnd::Link)),
             CTagEnd::Image => self.events().push(Event::End(TagEnd::Image)),
             CTagEnd::MetadataBlock(MetadataBlockKind::PlusesStyle) => {
-                let meta = std::mem::replace(&mut self.current_metadata_block, String::new());
-                self.events().push(Event::MetadataBlock(meta));
+                let graph = toml::from_str::<Graph>(&self.current_metadata_block)?;
+                {
+                    self.events().push(Event::Graph(graph));
+                }
+                // else {
+                //     bail!(
+                //         "metadata block didn't match any known patterns\n{}",
+                //         self.current_metadata_block
+                //     );
+                // }
+                self.current_metadata_block.clear();
                 self.in_metadata_block = false;
             }
 
@@ -354,6 +363,7 @@ impl<'i> ParserInner<'i> {
             CTagEnd::DefinitionListTitle => unimplemented!(),
             CTagEnd::DefinitionListDefinition => unimplemented!(),
         }
+        Ok(())
     }
 
     fn events(&mut self) -> &mut Vec<Event> {
@@ -410,8 +420,13 @@ pub enum Event {
     ///
     /// **Note**: Under some conditions HTML can also be parsed as an HTML Block, see [`Tag::HtmlBlock`] for details.
     InlineHtml(String),
-    /// A metadata block
-    MetadataBlock(String),
+    /// A graph:
+    /// ```md
+    /// +++
+    /// expr = "x ^ 2"
+    /// +++
+    /// ```
+    Graph(Graph),
 
     /// A [soft line break](https://spec.commonmark.org/0.31.2/#soft-line-breaks).
     ///
@@ -611,7 +626,7 @@ pub enum CodeBlockKind {
 
 use std::{collections::HashMap, fs, path::PathBuf};
 
-use crate::{paths, processor::Process};
+use crate::{graph::Graph, paths, processor::Process};
 use anyhow::{Context as _, Result, bail};
 use jiff::civil::Date;
 use pulldown_cmark::{

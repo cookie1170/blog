@@ -308,8 +308,37 @@ a {
 img,
 video {
     width: 60%;
+}
+
+img,
+video,
+.graph svg {
     border: var(--container-2) solid 2px;
     border-radius: 0.25rem;
+}
+
+.graph {
+    width: 100%;
+}
+
+.graph svg {
+    width: 100%;
+    height: auto;
+}
+
+.graph svg * {
+    vector-effect: non-scaling-stroke;
+    /* HACK: plotters only lets you use integers for stroke-width */
+    stroke-width: 1.5;
+}
+
+/* HACK: plotters doesn't let you use css variables as colours */
+.graph svg [stroke="#FFFFFF"] {
+    stroke: var(--on-bg);
+}
+
+.graph svg [stroke="#808080"] {
+    stroke: var(--container);
 }
 
 /* HACK: typst's svg output hardcodes colours as `fill="000000"`, etc */

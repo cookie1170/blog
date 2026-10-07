@@ -6,8 +6,11 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.104"
 dircpy = "0.3.20"
+itertools = "0.15.0"
 jiff = { version = "0.2.37", features = ["serde"] }
+meval = "0.2.0"
 openssl = "0.10.81"
+plotters = "0.3.7"
 pulldown-cmark = { version = "0.13.4", features = ["simd"] }
 pulldown-cmark-escape = { version = "0.11.0", features = ["simd"] }
 serde = { version = "1.0.229", features = ["derive"] }
