@@ -35,7 +35,7 @@ fn fragment() -> @location(0) vec4f {
 > [!TIP]
 > The `vec` functions are actually quite smart! If you use `vec4(1)`, you'll get a vector filled with ones!
 >
-> And if you use `vec4(some_vec3, 1)`, you'll get a `vec4` with the first 3 components from `some_vec4`, and `1` as the fouth!
+> And if you use `vec4(some_vec3, 1)`, you'll get a `vec4` with the first 3 components from `some_vec3`, and `1` as the fouth!
 
 But neither the function nor the shader are very exciting! So let's do something more fun!
 
@@ -58,7 +58,6 @@ For our square, the UVs are mapped to the corresponding value, but that doesn't 
 Often, this value might come from a texture instead, but, for simplicity's sake, we'll just use the UV here.
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
     // This creates a vec4 with `in.uv.x` as every component!
     return vec4(in.uv.x);
@@ -100,7 +99,6 @@ So let's use this on our square via the [`sin`] function!
 [`sin`]: https://www.w3.org/TR/WGSL/#sin-builtin
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
     return vec4(sin(in.uv.x * 6.2831));
 }
@@ -192,7 +190,6 @@ We can center it by subtracting 0.5 from each component, which moves the "window
 that we're looking at the function through by 0.5 units up and to the left.
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
     return vec4(length(in.uv - vec2(0.5)));
 }
@@ -203,7 +200,6 @@ fn fragment(in: VertexOutput) -> @location(0) vec4f {
 But this function can also be composed with other functions! Let's multiply its output by, say, $4 * 2 pi$ and then run it through `sin`!
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
     let input = length(in.uv - vec2(0.5)) * 4;
     return vec4(sin(input * 6.2831));
@@ -263,9 +259,11 @@ Let's try to use it with our `sin` example to spice it up a little.
 We can base the randomness on the UV of the point.
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time + pcg_2d(in.uv) * 0.15;
+    var input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += pcg_2d(in.uv) * 0.15;
+
     return vec4(sin(input * 6.2831));
 }
 ```
@@ -316,7 +314,7 @@ Using noise to change a position like that is called _domain warping_ -- a very 
 
 Black and white is boring! Let's add some colour, shall we?
 
-We can use the [`mix`] function in wgsl to blend between two values based on a third value ranging from 0 to 1.
+We can use the [`mix`] function to blend between two values based on a third value ranging from 0 to 1.
 It's also often referred to as `lerp` (linear interpolation).
 
 [`mix`]: https://www.w3.org/TR/WGSL/#mix-builtin
@@ -332,14 +330,14 @@ which is represented in Rust code by the [`LinearRgba`] type.
 [`saturate`]: https://www.w3.org/TR/WGSL/#saturate-float-builtin
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time
-        + textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
+    var input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
 
     let value = saturate(sin(input * 6.2831));
-    let colour = mix(dark, light, value);
-    return vec4(colour, 1);
+    let out = mix(dark, light, value);
+    return out;
 }
 ```
 
@@ -359,7 +357,7 @@ Here I've chosed to use the colours `#1c4f55` and `#226b6b`
 >
 > You can use a noise texture to affect the position you sample another texture from, be it noise or not.
 >
-> It's also common to use 3D noise textures to have a 2D noise texture that can change over time by varying its third input.
+> It's also common to use 3D noise textures to get 2D noise that can change over time by varying its third input.
 >
 > The possibilities are nearly endless!
 
@@ -376,15 +374,15 @@ Since most functions we work with in shaders have outputs in the range of 0 to 1
 we can simply multiply the resulting alpha by our function's output to mask a colour!
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time
-        + textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
+    var input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
 
     let value = saturate(sin(input * 6.2831));
-    var colour = vec4(light, 1);
-    colour.a *= value;
-    return colour;
+    var out = colour;
+    out.a *= value;
+    return out;
 }
 ```
 
@@ -413,15 +411,15 @@ size = "small"
 Let's use `smoothstep` with a bottom edge of `0` and a top edge of `0.25` to give a subtle fading to the edges.
 
 ```wesl
-@fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time
-        + textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
+    let input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
 
     let value = smoothstep(0, 0.25, sin(input * 6.2831));
-    var colour = vec4(light, 1);
-    colour.a *= value;
-    return colour;
+    var out = colour;
+    out.a *= value;
+    return out;
 }
 ```
 

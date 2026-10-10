@@ -4,9 +4,9 @@ struct MyMaterial {
     #[sampler(1)]
     noise: Handle<Image>,
     #[uniform(2)]
-    dark_colour: Vec3,
+    dark_colour: LinearRgba,
     #[uniform(3)]
-    light_colour: Vec3,
+    light_colour: LinearRgba,
 }
 
 impl Material2d for MyMaterial {
@@ -32,8 +32,8 @@ fn spawn_scene(
         Mesh2d(shape),
         MeshMaterial2d(materials.add(MyMaterial {
             noise: assets.load("../../../images/noise.webp"),
-            dark_colour: dark.to_linear().to_vec3(),
-            light_colour: light.to_linear().to_vec3(),
+            dark_colour: dark.to_linear(),
+            light_colour: light.to_linear(),
         })),
     ));
 
@@ -44,7 +44,7 @@ fn spawn_scene(
             ColorInputValue(dark)
             on(color_input_self_update)
             on(|trigger: On<ValueChange<Color>>, mesh_material: Single<&MeshMaterial2d<MyMaterial>>, mut materials: ResMut<Assets<MyMaterial>>| -> Result<()> {
-                materials.get_mut(&mesh_material.0).context("no material")?.dark_colour = trigger.value.to_linear().to_vec3();
+                materials.get_mut(&mesh_material.0).context("no material")?.dark_colour = trigger.value.to_linear();
                 Ok(())
             })
             --
@@ -52,7 +52,7 @@ fn spawn_scene(
             ColorInputValue(light)
             on(color_input_self_update)
             on(|trigger: On<ValueChange<Color>>, mesh_material: Single<&MeshMaterial2d<MyMaterial>>, mut materials: ResMut<Assets<MyMaterial>>| -> Result<()> {
-                materials.get_mut(&mesh_material.0).context("no material")?.light_colour = trigger.value.to_linear().to_vec3();
+                materials.get_mut(&mesh_material.0).context("no material")?.light_colour = trigger.value.to_linear();
                 Ok(())
             })
         ]

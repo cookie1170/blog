@@ -7,7 +7,9 @@ var noise_sampler: sampler;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time
-        + textureSample(noise_texture, noise_sampler, in.uv) * 0.15;
+    var input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += textureSample(noise_texture, noise_sampler, in.uv) * 0.15;
+
     return vec4(sin(input * 6.2831));
 }

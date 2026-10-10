@@ -6,16 +6,17 @@ var noise_texture: texture_2d<f32>;
 var noise_sampler: sampler;
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(2)
-var<uniform> dark: vec3f;
+var<uniform> dark: vec4f;
 @group(constants::MATERIAL_BIND_GROUP) @binding(3)
-var<uniform> light: vec3f;
+var<uniform> light: vec4f;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-    let input = length(in.uv - vec2(0.5)) * 4 - globals.time
-        + textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
+    var input = length(in.uv - vec2(0.5)) * 4;
+    input -= globals.time;
+    input += textureSample(noise_texture, noise_sampler, in.uv).r * 0.15;
 
     let value = saturate(sin(input * 6.2831));
-    let colour = mix(dark, light, value);
-    return vec4(colour, 1);
+    let out = mix(dark, light, value);
+    return out;
 }

@@ -4,7 +4,7 @@ struct MyMaterial {
     #[sampler(1)]
     noise: Handle<Image>,
     #[uniform(2)]
-    light_colour: Vec3,
+    colour: LinearRgba,
 }
 
 impl Material2d for MyMaterial {
@@ -27,13 +27,13 @@ fn spawn_scene(
 
     let shape = meshes.add(Rectangle::new(384.0, 384.0));
 
-    let light = Color::hsl(180.0, 0.51, 0.27);
+    let colour = Color::hsl(180.0, 0.51, 0.27);
 
     cmd.spawn((
         Mesh2d(shape),
         MeshMaterial2d(materials.add(MyMaterial {
             noise: assets.load("../../../images/noise.webp"),
-            light_colour: light.to_linear().to_vec3(),
+            colour: colour.to_linear(),
         })),
     ));
 }
