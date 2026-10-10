@@ -22,8 +22,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           add-rust-environment-hash-key: false
-      - name: Install dependencies
-        run: sudo apt-get update
+      - run: sudo apt-get update
       - name: Install dependencies
         run: sudo apt-get install pkg-config libfreetype6-dev libfontconfig1-dev
       - name: Build
