@@ -30,14 +30,6 @@ Now that we [know what a shader is](/what-is-a-shader), how is it made? In this 
     </div>
 </details>
 
-> [!WARNING]
-> This tutorial is written for **Bevy 0.20**, which isn't yet released!
-> You can use the release candidate version instead:
->
-> ```toml
-> bevy = "0.20.0-rc.2"
-> ```
-
 To apply a shader, you first need something to render! To start off, we'll be using 2D meshes
 because they're simpler than dealing with the third dimension right off the bat
 
@@ -513,8 +505,9 @@ Hooray!
 > Instead of implementing the `Material2d` trait, you need to implement [`MaterialExtension2d`]
 > and instead of `MeshMaterial2d`, you need to use [`SpriteMaterial`].
 >
-> For sprite material shaders, instead of sampling textures using `textureSample`, you can import utilities from
-> [`bevy_sprite_render::sprite_mesh::functions`], such as [`sample_sprite_texture`].
+> For sprite material shaders, instead of sampling the sprite's texture using `textureSample`,
+> you can import utilities from [`bevy_sprite_render::sprite_mesh::functions`],
+> such as [`sample_sprite_texture`], which take things like texture atlases into account.
 >
 > Make sure to call [`get_final_color`] at the end to apply tint and discard pixels based on the alpha (when the `alpha_mode` is [`Mask`][`AlphaMode2d::Mask`])!
 
@@ -522,10 +515,10 @@ Hooray!
 [`AlphaMode2d::Opaque`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Opaque
 [`AlphaMode2d::Blend`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Blend
 [`AlphaMode2d::Mask`]: https://docs.rs/bevy/latest/bevy/sprite_render/enum.AlphaMode2d.html#variant.Mask
-[`Material2d::alpha_mode`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/sprite_render/trait.Material2d.html#method.alpha_mode
+[`Material2d::alpha_mode`]: https://docs.rs/bevy/latest/bevy/sprite_render/trait.Material2d.html#method.alpha_mode
 [`sample_sprite_texture`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/fn.sample_sprite_texture.html
 [`get_final_color`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/fn.get_final_color.html
 [`bevy_sprite_render::sprite_mesh::functions`]: https://jannik4.github.io/wesldoc_bevy/bevy_sprite_render/latest/bevy_sprite_render/sprite_mesh/functions/index.html
-[`MaterialExtension2d`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/trait.MaterialExtension2d.html
-[`SpriteMaterial`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/struct.SpriteMaterial.html
-[`Sprite`]: https://docs.rs/bevy/0.20.0-rc.2/bevy/prelude/struct.Sprite.html
+[`MaterialExtension2d`]: https://docs.rs/bevy/latest/bevy/prelude/trait.MaterialExtension2d.html
+[`SpriteMaterial`]: https://docs.rs/bevy/latest/bevy/prelude/struct.SpriteMaterial.html
+[`Sprite`]: https://docs.rs/bevy/latest/bevy/prelude/struct.Sprite.html
