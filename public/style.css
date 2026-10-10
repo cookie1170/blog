@@ -171,7 +171,7 @@ blockquote h3,
 .details-content h1,
 .details-content h2,
 .details-content h3 {
-    margin: 0.75rem 0;
+    margin: 0.25rem 0;
 }
 
 /* table */
@@ -305,9 +305,20 @@ a {
     align-items: center;
 }
 
-img,
-video {
+.tiny {
+    width: 20%;
+}
+
+.small {
+    width: 40%;
+}
+
+.medium {
     width: 60%;
+}
+
+.full {
+    width: 100%;
 }
 
 img,
@@ -315,10 +326,6 @@ video,
 .graph svg {
     border: var(--container-2) solid 2px;
     border-radius: 0.25rem;
-}
-
-.graph {
-    width: 100%;
 }
 
 .graph svg {

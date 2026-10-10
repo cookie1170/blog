@@ -250,13 +250,54 @@ impl Post {
     }
 }
 
-use anyhow::{Context, bail};
+#[derive(Deserialize, Default, PartialEq, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum Size {
+    Tiny,
+    Small,
+    #[default]
+    Medium,
+    Full,
+}
+
+impl FromStr for Size {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let size = match s {
+            "tiny" => Self::Tiny,
+            "small" => Self::Small,
+            "medium" => Self::Medium,
+            "full" => Self::Full,
+            other => bail!("Expected 'small', 'medium' or 'full', got '{other}'"),
+        };
+
+        Ok(size)
+    }
+}
+
+impl Display for Size {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Size::Tiny => "tiny",
+            Size::Small => "small",
+            Size::Medium => "medium",
+            Size::Full => "full",
+        };
+
+        write!(f, "{s}")
+    }
+}
+
+use anyhow::{Context, Result, bail};
 use jiff::civil::Date;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     ffi::OsStr,
+    fmt::Display,
     fs::{self, OpenOptions},
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use crate::{

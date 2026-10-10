@@ -7,10 +7,11 @@ pub struct Graph {
     pub max_y: Option<f64>,
     pub aspect: Option<f64>,
     pub expr: String,
+    pub size: Size,
 }
 
 impl Graph {
-    const NUM_SAMPLES: u32 = 64;
+    const NUM_SAMPLES: u32 = 256;
     const GRID_LINES_Y: usize = 10;
     const HEIGHT: u32 = 256;
 
@@ -100,6 +101,8 @@ struct DeserializedGraph {
     y: Option<String>,
     aspect: Option<f64>,
     expr: String,
+    #[serde(default)]
+    size: Size,
 }
 
 impl TryFrom<DeserializedGraph> for Graph {
@@ -124,6 +127,7 @@ impl TryFrom<DeserializedGraph> for Graph {
         };
         let aspect = value.aspect;
         let expr = value.expr;
+        let size = value.size;
 
         Ok(Self {
             min_x,
@@ -132,6 +136,7 @@ impl TryFrom<DeserializedGraph> for Graph {
             max_y,
             aspect,
             expr,
+            size,
         })
     }
 }
@@ -149,6 +154,7 @@ fn parse_range(str: &str) -> Result<(f64, f64)> {
     Ok(range)
 }
 
+use crate::Size;
 use anyhow::{Context, Result, bail};
 use itertools::{Itertools as _, MinMaxResult};
 use plotters::{

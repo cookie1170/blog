@@ -167,13 +167,16 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
             E::Graph(graph) => {
                 self.write_fmt(format_args!(
                     r#"
-                    <p class="graph">
-                        {}
-                    </p>
+                    <div class="center">
+                        <article class="graph {size}">
+                            {}
+                        </article>
+                    </div>
                     "#,
                     graph
                         .graph()
                         .with_context(|| format!("failed to graph '{}'", graph.expr))?,
+                    size = graph.size
                 ))?;
             }
         }
@@ -340,6 +343,15 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 title,
                 id: _,
             } => {
+                let mut dest_url: &str = dest_url;
+                let size = 'block: {
+                    let Some((url, size_str)) = dest_url.rsplit_once(":") else {
+                        break 'block Size::Medium;
+                    };
+                    dest_url = url;
+                    size_str.parse()?
+                };
+
                 let url_prefix = fmt::from_fn(|f| {
                     if !dest_url.starts_with('/') && !dest_url.contains("://") {
                         write!(f, "{PREFIX}/{}/images/", self.meta.slug)?;
@@ -348,7 +360,9 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 });
 
                 if dest_url.ends_with(".webm") {
-                    self.write_fmt(format_args!("<video autoplay loop muted playinline"))?;
+                    self.write_fmt(format_args!(
+                        r#"<video class="{size}" autoplay loop muted playinline"#
+                    ))?;
                     self.write_image_meta(title)?;
                     self.write(">")?;
                     self.write_fmt(format_args!(r#"<source src="{url_prefix}"#))?;
@@ -356,7 +370,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                     self.write(r#"" type="video/webm">"#)?;
                     self.write("</video>")?;
                 } else {
-                    self.write_fmt(format_args!(r#"<img src="{url_prefix}"#,))?;
+                    self.write_fmt(format_args!(r#"<img class="{size}" src="{url_prefix}"#,))?;
                     self.write_escaped_href(&dest_url)?;
                     self.write("\"")?;
                     self.write_image_meta(title)?;
@@ -684,7 +698,7 @@ pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Res
 }
 
 use crate::{
-    PREFIX, PostMeta,
+    PREFIX, PostMeta, Size,
     parser::{CodeBlockKind, Event, Tag, TagEnd},
     paths,
     processor::Process,
