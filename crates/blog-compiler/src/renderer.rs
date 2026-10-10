@@ -27,7 +27,7 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
         <link href="{PREFIX}/public/style.css" rel="stylesheet" />
-        <title>{title} -- Cookie's blog</title>
+        <title>{title} // Cookie's blog</title>
         {dev_script}
     </head>
     <body>
