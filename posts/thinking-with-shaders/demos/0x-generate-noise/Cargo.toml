@@ -1,0 +1,9 @@
+[package]
+name = "generate-noise"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy_math = "0.19.1"
+image = { version = "0.25.10", default-features = false, features = ["webp"] }
+noiz = { version = "0.5.0", default-features = false, features = ["std"] }
