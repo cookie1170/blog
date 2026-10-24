@@ -278,6 +278,10 @@ They will be combined into one uniform, which can be used in WESL with a struct:
 struct MyMaterial {
     some_uniform: vec4f,
 }
+
+fn fragment() {
+
+}
 ```
 
 The fields in WESL should be in the same order as in Rust.

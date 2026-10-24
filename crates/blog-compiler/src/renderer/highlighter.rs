@@ -3,6 +3,7 @@
 /// Returns HTML source highlighted using `<span>`s
 pub fn highlight(language: Language, source: &str) -> Result<String> {
     let highlight_names = [
+        "keyword",
         "type",
         "type.builtin",
         "property",
@@ -14,7 +15,6 @@ pub fn highlight(language: Language, source: &str) -> Result<String> {
         "comment",
         "punctuation",
         "label",
-        "keyword",
         "string",
         "attribute",
         "operator",
