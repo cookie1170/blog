@@ -44,6 +44,7 @@ struct ParserInner<'i> {
     is_table_header: bool,
     in_metadata_block: bool,
     ignore: bool,
+    current_code_block: Option<CodeBlock>,
 }
 
 impl Process for Parser {
@@ -95,6 +96,7 @@ impl Process for Parser {
             in_metadata_block: false,
             current_metadata_block: String::new(),
             ignore: false,
+            current_code_block: None,
         };
 
         let mut iter = events.iter_mut();
@@ -167,6 +169,8 @@ impl<'i> ParserInner<'i> {
             CE::Text(text) => {
                 if self.in_metadata_block {
                     self.current_metadata_block.push_str(&text);
+                } else if let Some(code_block) = &mut self.current_code_block {
+                    code_block.contents.push_str(&text);
                 } else {
                     self.events().push(Event::Text(text.into()));
                 }
@@ -228,10 +232,17 @@ impl<'i> ParserInner<'i> {
                     .collect(),
             })),
             CTag::BlockQuote(kind) => self.events().push(Event::Start(Tag::BlockQuote(kind))),
-            CTag::CodeBlock(kind) => self.events().push(Event::Start(Tag::CodeBlock(match kind {
-                CCodeBlockKind::Indented => CodeBlockKind::Indented,
-                CCodeBlockKind::Fenced(lang) => CodeBlockKind::Fenced(lang.into()),
-            }))),
+            CTag::CodeBlock(kind) => {
+                let info = match kind {
+                    CCodeBlockKind::Indented => String::new(),
+                    CCodeBlockKind::Fenced(info) => info.to_string(),
+                };
+                let code_block = CodeBlock {
+                    info,
+                    contents: String::new(),
+                };
+                self.current_code_block = Some(code_block);
+            }
             CTag::HtmlBlock => self.events().push(Event::Start(Tag::HtmlBlock)),
             CTag::List(first) => self.events().push(Event::Start(Tag::List(first))),
             CTag::Item => self.events().push(Event::Start(Tag::Item)),
@@ -317,7 +328,12 @@ impl<'i> ParserInner<'i> {
             CTagEnd::BlockQuote(block_quote_kind) => self
                 .events()
                 .push(Event::End(TagEnd::BlockQuote(block_quote_kind))),
-            CTagEnd::CodeBlock => self.events().push(Event::End(TagEnd::CodeBlock)),
+            CTagEnd::CodeBlock => {
+                let Some(current_code_block) = self.current_code_block.take() else {
+                    bail!("Code block ended without starting");
+                };
+                self.events().push(Event::CodeBlock(current_code_block));
+            }
             CTagEnd::HtmlBlock => self.events().push(Event::End(TagEnd::HtmlBlock)),
             CTagEnd::List(ordered) => self.events().push(Event::End(TagEnd::List(ordered))),
             CTagEnd::Item => self.events().push(Event::End(TagEnd::Item)),
@@ -396,6 +412,15 @@ pub enum Event {
     /// `code`
     /// ```
     Code(String),
+    /// A code block.
+    ///
+    /// ```markdown
+    /// ```rs
+    /// fn main() {
+    ///     println!("hello world");
+    /// }
+    /// ```
+    CodeBlock(CodeBlock),
     /// An inline math environment node.
     /// Requires [`Options::ENABLE_MATH`].
     ///
@@ -491,8 +516,6 @@ pub enum Tag {
     /// > note quote
     /// ```
     BlockQuote(Option<BlockQuoteKind>),
-    /// A code block.
-    CodeBlock(CodeBlockKind),
 
     /// An HTML block.
     ///
@@ -591,7 +614,6 @@ pub enum TagEnd {
     Heading(HeadingLevel),
 
     BlockQuote(Option<BlockQuoteKind>),
-    CodeBlock,
 
     HtmlBlock,
 
@@ -616,12 +638,20 @@ pub enum TagEnd {
     Image,
 }
 
-/// Codeblock kind.
-#[derive(Clone, Debug, PartialEq)]
-pub enum CodeBlockKind {
-    Indented,
-    /// The value contained in the tag describes the language of the code, which may be empty.
-    Fenced(String),
+/// The contents and info of a codeblock.
+#[derive(PartialEq, Debug, Clone)]
+pub struct CodeBlock {
+    /// Info about the codeblock, which typically describes the language
+    /// ```markdown
+    /// ```rust
+    ///    ^^^^
+    /// fn main() {
+    ///     println!("Hello world!");
+    /// }
+    /// ```
+    pub info: String,
+    /// The actual code contained in the codeblock.
+    pub contents: String,
 }
 
 use std::{collections::HashMap, fs, path::PathBuf};

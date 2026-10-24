@@ -1,3 +1,5 @@
+mod highlighter;
+
 pub const DATE_FORMAT: &str = "%d %B %Y";
 
 #[derive(PartialEq, Debug, Clone)]
@@ -132,6 +134,27 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 self.write_escaped(&code)?;
                 self.write("</code>")?;
             }
+            E::CodeBlock(code_block) => {
+                self.write("<pre class=\"code-wrapper\"><code>")?;
+                if code_block.info.is_empty() {
+                    self.write_escaped(&code_block.contents)?;
+                } else {
+                    let lang: Language = code_block.info.parse()?;
+                    let highlighted = highlighter::highlight(lang, &code_block.contents)
+                        .with_context(|| {
+                            format!(
+                                "failed to highlight code block\n\
+                                ```{lang}\n\
+                                {}\n\
+                                ```\
+                                ",
+                                code_block.contents
+                            )
+                        })?;
+                    self.write(highlighted)?;
+                }
+                self.write("</code></pre>")?;
+            }
             E::InlineMath(math) => {
                 let result = self.typst.compile(math.to_string()).with_context(|| {
                     format!("failed to compile typst expression '{}'", math.trim())
@@ -253,11 +276,6 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 }
                 self.write(">")?;
             }
-            Tag::CodeBlock(kind) => match kind {
-                // TODO: Syntax highlighting for languages
-                CodeBlockKind::Fenced(_info) => self.write("<pre class=\"code-wrapper\"><code>")?,
-                CodeBlockKind::Indented => self.write("<pre class=\"code-wrapper\"><code>")?,
-            },
 
             Tag::List(None) => self.write("<ul>")?,
             Tag::List(Some(1)) => self.write("<ol>")?,
@@ -413,7 +431,6 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
 
             TagEnd::HtmlBlock => { /* nop */ }
             TagEnd::BlockQuote(_) => self.write("</blockquote>")?,
-            TagEnd::CodeBlock => self.write("</code></pre>")?,
             TagEnd::Paragraph => self.write("</p>")?,
             TagEnd::Emphasis => self.write("</em>")?,
             TagEnd::Strong => self.write("</strong>")?,
@@ -444,6 +461,12 @@ impl<'i, 'm, 'r, O: io::Write> RendererInner<'i, 'm, 'r, O> {
                 | Event::Code(text)
                 | Event::Text(text) => {
                     self.write_escaped_attr(&text)?;
+                }
+                Event::CodeBlock(code_block) => {
+                    self.write_escaped_attr("```\n")?;
+                    self.write_escaped_attr(&code_block.info)?;
+                    self.write_escaped_attr(&code_block.contents)?;
+                    self.write_escaped_attr("\n```")?;
                 }
                 Event::InlineMath(text) => {
                     self.write("$")?;
@@ -699,9 +722,10 @@ pub fn write_index(mut writer: impl Write, metas: &[PostMeta], dev: bool) -> Res
 
 use crate::{
     PREFIX, PostMeta, Size,
-    parser::{CodeBlockKind, Event, Tag, TagEnd},
+    parser::{Event, Tag, TagEnd},
     paths,
     processor::Process,
+    renderer::highlighter::Language,
 };
 use anyhow::{Context, Error, Result, bail};
 use pulldown_cmark::{Alignment, BlockQuoteKind, LinkType};
