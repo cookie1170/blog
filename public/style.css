@@ -263,9 +263,10 @@ code.inline-code {
     --function: hsl(143.6, 30%, 60.2%);
     --type: hsl(30.8, 94.7%, 70.2%);
     --literal: hsl(333, 47.1%, 66.7%);
-    --punctuation: #7e9191;
     --attribute: #73a3b6;
+    --string: hsl(132, 33.9%, 53.7%);
     --comment: var(--muted);
+    --punctuation: #7e9191;
 }
 
 .keyword {
@@ -276,11 +277,11 @@ code.inline-code {
     color: var(--function);
 }
 
-.type {
-    color: var(--type);
-}
-
-.type-builtin {
+.type,
+.type-builtin,
+.constant,
+.constructor,
+.label {
     color: var(--type);
 }
 
@@ -292,16 +293,17 @@ code.inline-code {
     color: var(--attribute);
 }
 
-.constructor {
-    color: var(--type);
-}
-
-.punctuation {
-    color: var(--punctuation);
+.string {
+    color: var(--string);
 }
 
 .comment {
     color: var(--comment);
+}
+
+.punctuation,
+.operator {
+    color: var(--punctuation);
 }
 
 /* misc */
